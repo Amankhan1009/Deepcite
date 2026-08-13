@@ -64,7 +64,7 @@ Legend: ☐ not started · ▶ in progress · ✓ done
         methodology, evidence synthesis, contradictions, limitations, risks,
         recommendations, report-depth metrics, and deterministic evaluation
 ✓ M30 — Docker Compose (backend + Postgres + frontend) for local dev
-☐ M31 — GitHub Actions CI: lint (Ruff), test (Pytest), build
+✓ M31 — GitHub Actions CI: lint (Ruff), test (Pytest), build
 ☐ M32 — Production deployment (backend + frontend), secrets management,
         final security pass (RBAC field enforcement, input validation
         audit, safe-logging audit), portfolio README

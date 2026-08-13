@@ -80,6 +80,10 @@ PostgreSQL, the FastAPI backend, and the Next.js frontend. The backend container
 runs Alembic migrations, initializes LangGraph checkpointer tables, supports
 Tavily MCP via npx, and completed an end-to-end Docker research smoke run.
 
+Milestone 31 is complete and verified with GitHub Actions backend lint/tests,
+frontend lint/build, Docker image builds, and Docker Hub publishing after tests
+pass.
+
 ## Next milestone
 - [x] Complete Milestone 27 — Settings page, research history list/detail views
 - [x] Complete Milestone 28 — Frontend resume workflow for paused/interrupted
@@ -87,7 +91,10 @@ Tavily MCP via npx, and completed an end-to-end Docker research smoke run.
 - [x] Complete Milestone 29 — Deeper report generation and report-quality
       evaluation
 - [x] Complete Milestone 30 — Docker Compose for local development
-- [ ] Start Milestone 31 — GitHub Actions CI: lint, test, build
+- [x] Complete Milestone 31 — GitHub Actions CI: lint, test, build, Docker
+      image publish
+- [ ] Start Milestone 32 — Production deployment, secrets management, final
+      security pass, portfolio README
 
 ## Future report-quality work
 - [ ] Add an optional controlled expansion pass when a generated report still

@@ -1,10 +1,10 @@
 # CURRENT_STATE.md
 
-Last updated: Milestone 30 — Docker Compose local development complete
+Last updated: Milestone 31 — GitHub Actions CI complete
 
 ## Status
 Phase 2 (Agent mesh), Phase 3 (Quality layer), Phase 4 (Product layer), and
-Milestones 28-30 in Phase 5 are complete. The backend scaffold, core database
+Milestones 28-31 in Phase 5 are complete. The backend scaffold, core database
 models, JWT authentication, workspace CRUD, LangGraph skeleton, and Alembic
 migration are in place, with the migration applied to Neon.
 
@@ -235,6 +235,12 @@ migration are in place, with the migration applied to Neon.
 - M30 local smoke verification completed registration/login, workspace access,
   research start, Tavily-backed research, report generation, and report review
   through the Docker stack.
+- M31 adds GitHub Actions CI for backend Ruff lint, backend Pytest with a
+  PostgreSQL service, frontend ESLint, and frontend production build.
+- M31 CI also builds backend and frontend Docker images after tests pass and
+  pushes them to Docker Hub using GitHub Actions repository secrets.
+- M31 verification completed with GitHub Actions passing backend tests,
+  frontend checks, Docker image builds, and Docker Hub image publishing.
 
 ## What doesn't exist yet
 - True streamed/SSE progress updates; the current M23 UI shows an in-flight
@@ -249,4 +255,5 @@ migration are in place, with the migration applied to Neon.
   the target word-count range.
 
 ## Next milestone
-Milestone 31 — GitHub Actions CI: lint (Ruff), test (Pytest), build.
+Milestone 32 — Production deployment, secrets management, final security pass,
+and portfolio README.
