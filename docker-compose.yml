@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: deepcite
+      POSTGRES_USER: deepcite
+      POSTGRES_PASSWORD: deepcite
+    ports:
+      - "5432:5432"
+    volumes:
+      - deepcite_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepcite -d deepcite"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://deepcite:deepcite@db:5432/deepcite
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             python -c 'import asyncio; from app.infrastructure.agents.checkpointer import setup_checkpointer_tables; asyncio.run(setup_checkpointer_tables())' &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: npm run dev -- --hostname 0.0.0.0
+
+volumes:
+  deepcite_postgres_data:

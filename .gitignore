@@ -1,0 +1,26 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+backend/venv/
+
+# Env files
+.env
+.env.*
+backend/.env
+frontend/.env.local
+
+# Node / Next
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Docker/local data
+*.log
+
+# Editor
+.vscode/
+.idea/
