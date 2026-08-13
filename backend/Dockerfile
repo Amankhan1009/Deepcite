@@ -19,4 +19,9 @@ COPY alembic.ini .
 COPY alembic ./alembic
 COPY app ./app
 
+COPY start.sh .
+RUN chmod +x start.sh
+
 EXPOSE 8000
+
+CMD ["./start.sh"]
