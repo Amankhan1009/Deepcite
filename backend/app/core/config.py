@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     app_name: str = "AI Deep Research Platform"
     environment: str = "development"
+    frontend_origin: str = "http://localhost:3000"
     database_url: str  # postgresql+asyncpg://user:pass@host/db?ssl=require
     gemini_api_key: str = ""  # required for scripts/gemini_spike.py, not app yet
     groq_api_key: str = ""
