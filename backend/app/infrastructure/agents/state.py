@@ -5,6 +5,7 @@ from typing import Annotated, TypedDict
 class ResearchTask(TypedDict):
     """Input delivered to one parallel Research Agent worker."""
 
+    research_run_id: str
     sub_question: str
     sub_question_index: int
 

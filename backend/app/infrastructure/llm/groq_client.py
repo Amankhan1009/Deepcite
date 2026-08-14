@@ -34,6 +34,11 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_STRUCTURED_OUTPUT_MODELS = {
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+}
+GROQ_TEMPERATURE = 0.0
 MAX_ATTEMPTS = 4
 INITIAL_RETRY_DELAY_SECONDS = 1.0
 MAX_RETRY_DELAY_SECONDS = 8.0
@@ -55,6 +60,12 @@ REPORT_MAX_REASONING_ITEMS = 8
 REPORT_MAX_REASONING_ITEM_CHARS = 450
 REPORT_MAX_FACT_CHECK_ITEMS = 6
 REPORT_MAX_FACT_CHECK_EXPLANATION_CHARS = 350
+EVIDENCE_MAX_COMPLETION_TOKENS = 1_200
+EVIDENCE_MAX_SOURCE_CHARS = 2_000
+EVIDENCE_MAX_ITEMS = 5
+EVIDENCE_MAX_CLAIM_CHARS = 220
+GROQ_CONCURRENCY = 1
+_groq_semaphore = asyncio.Semaphore(GROQ_CONCURRENCY)
 
 
 class _ReasoningExtractionWire(BaseModel):
@@ -157,6 +168,10 @@ def _strict_json_schema(response_schema: type[BaseModel]) -> dict:
     return schema
 
 
+def _supports_structured_output(model_name: str) -> bool:
+    return model_name in GROQ_STRUCTURED_OUTPUT_MODELS
+
+
 def _response_format(response_schema: type[BaseModel]) -> dict:
     return {
         "type": "json_schema",
@@ -190,6 +205,32 @@ def _is_retryable_error(error: APIError) -> bool:
     }
 
 
+def _get_retry_delay(error: APIError, attempt: int) -> float:
+    """Calculate a retry delay, respecting Groq's requested wait time."""
+    error_text = str(error)
+
+    match = re.search(
+        r"try again in ([0-9]+(?:\.[0-9]+)?)s",
+        error_text,
+        re.IGNORECASE,
+    )
+
+    if match:
+        return float(match.group(1)) + random.uniform(0.25, 0.75)
+
+    exponential_delay = min(
+        INITIAL_RETRY_DELAY_SECONDS * (2**attempt),
+        MAX_RETRY_DELAY_SECONDS,
+    )
+
+    return exponential_delay + random.uniform(0.25, 0.75)
+
+
+@traceable_span(
+    name="llm.groq.structured_generation",
+    run_type="llm",
+    process_inputs=process_llm_inputs,
+)
 @traceable_span(
     name="llm.groq.structured_generation",
     run_type="llm",
@@ -202,40 +243,50 @@ async def _generate_content_with_retry(
     *,
     max_completion_tokens: int | None = None,
 ) -> ChatCompletion:
-    for attempt in range(MAX_ATTEMPTS):
-        try:
-            request_kwargs = {
-                "model": GROQ_MODEL,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": contents,
-                    }
-                ],
-                "response_format": _response_format(response_schema),
-            }
+    async with _groq_semaphore:
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                request_kwargs = {
+                    "model": GROQ_MODEL,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": contents,
+                        }
+                    ],
+                    "temperature": GROQ_TEMPERATURE,
+                }
 
-            if max_completion_tokens is not None:
-                request_kwargs["max_completion_tokens"] = max_completion_tokens
+                if _supports_structured_output(GROQ_MODEL):
+                    request_kwargs["response_format"] = _response_format(
+                        response_schema,
+                    )
 
-            return await client.chat.completions.create(**request_kwargs)
+                if max_completion_tokens is not None:
+                    request_kwargs["max_completion_tokens"] = max_completion_tokens
 
-        except APIError as error:
-            is_last_attempt = attempt == MAX_ATTEMPTS - 1
+                return await client.chat.completions.create(**request_kwargs)
 
-            if is_last_attempt or not _is_retryable_error(error):
-                raise
+            except APIError as error:
+                is_last_attempt = attempt == MAX_ATTEMPTS - 1
 
-            exponential_delay = min(
-                INITIAL_RETRY_DELAY_SECONDS * (2**attempt),
-                MAX_RETRY_DELAY_SECONDS,
-            )
-            jitter = random.uniform(0, 0.5)
+                if is_last_attempt or not _is_retryable_error(error):
+                    raise
 
-            await asyncio.sleep(exponential_delay + jitter)
+                delay = _get_retry_delay(error, attempt)
+
+                logger.warning(
+                    "Groq request failed with %s. "
+                    "Retrying in %.2fs (attempt %d/%d).",
+                    type(error).__name__,
+                    delay,
+                    attempt + 1,
+                    MAX_ATTEMPTS,
+                )
+
+                await asyncio.sleep(delay)
 
     raise RuntimeError("Groq retry loop exited unexpectedly")
-
 
 def _response_text(response: ChatCompletion) -> str:
     content = response.choices[0].message.content
@@ -314,14 +365,26 @@ async def generate_research_plan(question: str) -> ResearchPlan:
     response = await _generate_content_with_retry(
         client=client,
         contents=(
-            "Break this research question into 3-5 focused sub-questions "
-            "and a one-sentence research strategy: "
-            f"'{question}'"
+            "Create exactly 3 sub-questions and a one-sentence strategy for "
+            "this research question. Keep the output concise and directly "
+            f"actionable: '{question}'"
         ),
         response_schema=ResearchPlan,
+        max_completion_tokens=800,
     )
 
     return ResearchPlan.model_validate_json(_response_text(response))
+
+
+def _truncate_source_for_evidence(source_content: str) -> str:
+    """Bound evidence input size to avoid oversized Groq JSON-generation requests."""
+    trimmed = source_content.strip()
+
+    if len(trimmed) <= EVIDENCE_MAX_SOURCE_CHARS:
+        return trimmed
+
+    truncated = trimmed[:EVIDENCE_MAX_SOURCE_CHARS].rsplit(" ", 1)[0]
+    return f"{truncated} ..."
 
 
 async def generate_evidence(
@@ -332,17 +395,22 @@ async def generate_evidence(
 
     client = _get_client()
     title = source_title or "Untitled source"
+    bounded_source_content = _truncate_source_for_evidence(source_content)
 
     response = await _generate_content_with_retry(
         client=client,
         contents=(
-            "Extract only directly supported factual claims from the source "
+            "Extract up to "
+            f"{EVIDENCE_MAX_ITEMS} directly supported factual claims from the source "
             "below. Do not infer, speculate, or add outside knowledge. "
-            "Return concise claims that can be cited in a research report.\n\n"
+            "Return concise, citation-ready claims. Each claim must be short "
+            f"({EVIDENCE_MAX_CLAIM_CHARS} characters or fewer). "
+            "Do not repeat claims.\n\n"
             f"Source title: {title}\n\n"
-            f"Source content:\n{source_content}"
+            f"Source content:\n{bounded_source_content}"
         ),
         response_schema=EvidenceExtraction,
+        max_completion_tokens=EVIDENCE_MAX_COMPLETION_TOKENS,
     )
 
     return EvidenceExtraction.model_validate_json(_response_text(response))

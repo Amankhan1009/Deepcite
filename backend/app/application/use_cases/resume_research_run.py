@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,12 @@ from app.application.use_cases.persist_research_result import (
     persist_report_result,
     persist_research_artifacts,
 )
-from app.infrastructure.agents.graph import resume_research_graph
+from app.infrastructure.agents.graph import (
+    ResearchRunCancelledError,
+    resume_research_graph,
+)
+from app.infrastructure.agents.task_registry import discard as discard_task
+from app.infrastructure.agents.task_registry import register as register_task
 from app.infrastructure.db.models.research_run import ResearchRun
 from app.infrastructure.db.repositories.research_run_repository import (
     ResearchRunRepository,
@@ -42,8 +48,17 @@ async def resume_research_run(
     if run.status not in {"paused", "failed"}:
         raise ResearchRunNotResumableError
 
+    graph_task = register_task(str(run.id), resume_research_graph(str(run.id)))
+
     try:
-        result = await resume_research_graph(str(run.id))
+        result = await graph_task
+
+        await db.refresh(run)
+
+        if run.status == "cancelled":
+            await db.commit()
+            await db.close()
+            return run
 
         await persist_research_artifacts(
             db=db,
@@ -51,9 +66,23 @@ async def resume_research_run(
             result=result,
         )
 
+        await db.refresh(run)
+
+        if run.status == "cancelled":
+            await db.commit()
+            await db.close()
+            return run
+
         if result.get("__interrupt__"):
             run.status = "awaiting_approval"
         else:
+            await db.refresh(run)
+
+            if run.status == "cancelled":
+                await db.commit()
+                await db.close()
+                return run
+
             await persist_report_result(
                 db=db,
                 run=run,
@@ -66,11 +95,31 @@ async def resume_research_run(
             )
             run.status = "completed"
 
+    except ResearchRunCancelledError:
+        run.status = "cancelled"
+        await db.commit()
+        await db.close()
+        return run
+
+    except asyncio.CancelledError:
+        if run.status != "cancelled":
+            run.status = "cancelled"
+            await db.commit()
+        await db.close()
+        raise
+
     except Exception:
-        run.status = "paused"
+        await db.refresh(run)
+
+        if run.status != "cancelled":
+            run.status = "paused"
+
         await db.commit()
         await db.close()
         raise
+
+    finally:
+        discard_task(str(run.id))
 
     await db.commit()
     await db.close()

@@ -178,3 +178,60 @@ async def test_other_user_cannot_approve_research_run():
                 )
             )
             await session.commit()
+
+
+async def test_cancelled_run_cannot_be_approved():
+    async with await _client() as client:
+        token, email = await _register(client)
+
+        async with AsyncSessionLocal() as session:
+            user = (
+                await session.execute(
+                    select(User).where(User.email == email)
+                )
+            ).scalar_one()
+
+            workspace = Workspace(
+                user_id=user.id,
+                name="Cancelled Approval Workspace",
+            )
+            session.add(workspace)
+            await session.flush()
+
+            research_run = ResearchRun(
+                workspace_id=workspace.id,
+                user_id=user.id,
+                question="Cancelled run should not approve",
+                status="cancelled",
+            )
+            session.add(research_run)
+            await session.commit()
+
+            research_run_id = research_run.id
+            workspace_id = workspace.id
+            user_id = user.id
+
+        response = await client.post(
+            f"/api/v1/research/{research_run_id}/approve",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 409
+
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                delete(ResearchRun).where(
+                    ResearchRun.id == research_run_id
+                )
+            )
+            await session.execute(
+                delete(Workspace).where(
+                    Workspace.id == workspace_id
+                )
+            )
+            await session.execute(
+                delete(User).where(
+                    User.id == user_id
+                )
+            )
+            await session.commit()

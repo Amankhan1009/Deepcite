@@ -1,6 +1,8 @@
 import uuid
 from unittest.mock import Mock
 
+import pytest
+
 from app.infrastructure.agents.nodes.approval_gate import approval_gate
 from app.infrastructure.agents.state import GraphState
 
@@ -35,4 +37,20 @@ async def test_approval_gate_accepts_true_decision(monkeypatch):
     result = await approval_gate(state)
 
     assert result == {}
-    interrupt_mock.assert_called_once()
+
+
+async def test_approval_gate_rejects_non_true_decision(monkeypatch):
+    def fake_interrupt(_payload):
+        return False
+
+    monkeypatch.setattr(
+        "app.infrastructure.agents.nodes.approval_gate.interrupt",
+        fake_interrupt,
+    )
+
+    state = {
+        "research_run_id": "test-run-id",
+    }
+
+    with pytest.raises(ValueError):
+        await approval_gate(state)

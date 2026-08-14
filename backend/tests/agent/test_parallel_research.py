@@ -30,6 +30,7 @@ def test_fan_out_research_creates_one_task_per_subquestion():
     assert sends[0].arg == {
         "sub_question": "What are the security risks?",
         "sub_question_index": 0,
+        "research_run_id": "parallel-test",
     }
 
     assert sends[1].arg["sub_question_index"] == 1

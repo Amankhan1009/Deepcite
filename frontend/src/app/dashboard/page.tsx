@@ -9,6 +9,7 @@ import {
   FolderKanban,
   LogOut,
   Plus,
+  Square,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,22 +38,98 @@ const progressSteps = [
   "Planning",
   "Researching sources",
   "Verifying evidence",
+  "Human approval",
   "Generating report",
 ];
 
-function progressIndex(status: string) {
-  if (status === "planning") return 0;
+const ACTIVE_EXECUTION_STATUSES = [
+  "planning",
+  "researching",
+  "verifying",
+  "reasoning",
+  "fact_checking",
+  "awaiting_approval",
+  "generating_report",
+] as const;
+
+const CANCELLABLE_STATUSES = [
+  "researching",
+  "verifying",
+  "reasoning",
+  "fact_checking",
+  "awaiting_approval",
+  "generating_report",
+] as const;
+
+const TERMINAL_STATUSES = ["completed", "cancelled", "failed"] as const;
+
+function stageProgress(
+  status: string,
+  statusBeforeCancel: string | null,
+): { completedThrough: number; activeIndex: number } {
+  if (status === "cancelled") {
+    const fallbackStatus =
+      statusBeforeCancel && statusBeforeCancel !== "cancelled"
+        ? statusBeforeCancel
+        : "planning";
+    const fallbackProgress = stageProgress(fallbackStatus, null);
+
+    return {
+      completedThrough: fallbackProgress.completedThrough,
+      activeIndex: -1,
+    };
+  }
+
+  if (status === "planning") {
+    return {
+      completedThrough: -1,
+      activeIndex: 0,
+    };
+  }
+
+  if (status === "researching") {
+    return {
+      completedThrough: 0,
+      activeIndex: 1,
+    };
+  }
+
   if (
-    status === "researching" ||
     status === "verifying" ||
     status === "reasoning" ||
     status === "fact_checking"
   ) {
-    return 1;
+    return {
+      completedThrough: 1,
+      activeIndex: 2,
+    };
   }
-  if (status === "generating_report") return 3;
-  if (status === "completed") return 3;
-  return 0;
+
+  if (status === "awaiting_approval") {
+    return {
+      completedThrough: 2,
+      activeIndex: 3,
+    };
+  }
+
+  if (status === "generating_report") {
+    return {
+      completedThrough: 3,
+      activeIndex: 4,
+    };
+  }
+
+  if (status === "completed") {
+    return {
+      completedThrough: 4,
+      activeIndex: -1,
+    };
+  }
+
+  return {
+    completedThrough: -1,
+    activeIndex: 0,
+  };
 }
 
 export default function DashboardPage() {
@@ -68,6 +145,10 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [isStartingResearch, setIsStartingResearch] = useState(false);
+  const [isCancellingResearch, setIsCancellingResearch] = useState(false);
+  const [lastNonCancelledStatus, setLastNonCancelledStatus] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -148,6 +229,17 @@ export default function DashboardPage() {
       return;
     }
 
+    if (
+      isStartingResearch ||
+      researchRun?.status === "researching" ||
+      researchRun?.status === "awaiting_approval"
+    ) {
+      setError(
+        "A research run is already active. Wait for completion or approve it first.",
+      );
+      return;
+    }
+
     setIsStartingResearch(true);
     setResearchRun(null);
 
@@ -161,7 +253,9 @@ export default function DashboardPage() {
       });
 
       setResearchRun(run);
-      setQuestion("");
+      if (run.status !== "cancelled") {
+        setLastNonCancelledStatus(run.status);
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -173,14 +267,122 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleCancelResearch() {
+    if (!researchRun) {
+      return;
+    }
+
+    setError("");
+    setIsCancellingResearch(true);
+
+    const statusBeforeCancel = researchRun.status;
+
+    try {
+      const cancelledRun = await apiFetch<ResearchRun>(
+        `/research/${researchRun.id}/cancel`,
+        { method: "POST" },
+      );
+
+      setResearchRun(cancelledRun);
+
+      if (cancelledRun.status === "cancelled") {
+        setLastNonCancelledStatus(statusBeforeCancel);
+      } else {
+        setLastNonCancelledStatus(cancelledRun.status);
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to stop research",
+      );
+    } finally {
+      setIsCancellingResearch(false);
+    }
+  }
+
   function handleLogout() {
     clearToken();
     router.replace("/login");
   }
 
-  const currentProgress = researchRun
-    ? progressIndex(researchRun.status)
-    : -1;
+  const currentStageProgress = researchRun
+    ? stageProgress(researchRun.status, lastNonCancelledStatus)
+    : { completedThrough: -1, activeIndex: -1 };
+  const isStartBlockedByRun =
+    researchRun !== null &&
+    ACTIVE_EXECUTION_STATUSES.includes(
+      researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+    );
+  const isStartDisabled =
+    isStartingResearch ||
+    isStartBlockedByRun ||
+    !selectedWorkspaceId;
+  const canStopResearch =
+    researchRun !== null &&
+    CANCELLABLE_STATUSES.includes(
+      researchRun.status as (typeof CANCELLABLE_STATUSES)[number],
+    );
+  const canReviewResearch =
+    researchRun?.status === "awaiting_approval" ||
+    researchRun?.status === "completed";
+
+  useEffect(() => {
+    const currentResearchRunId = researchRun?.id;
+
+    if (!currentResearchRunId) {
+      return;
+    }
+
+    let isCancelled = false;
+    let intervalId: number;
+
+    async function pollResearchStatus() {
+      if (isCancelled) {
+        return;
+      }
+
+      try {
+        const updatedRun = await apiFetch<ResearchRun>(`/research/${currentResearchRunId}`);
+
+        if (!isCancelled) {
+          setResearchRun(updatedRun);
+
+          if (updatedRun.status !== "cancelled") {
+            setLastNonCancelledStatus(updatedRun.status);
+          }
+        }
+
+        if (
+          !isCancelled &&
+          TERMINAL_STATUSES.includes(
+            updatedRun.status as (typeof TERMINAL_STATUSES)[number],
+          )
+        ) {
+          window.clearInterval(intervalId);
+        }
+      } catch (requestError) {
+        if (
+          requestError instanceof ApiError &&
+          requestError.status === 401
+        ) {
+          clearToken();
+          router.replace("/login");
+          return;
+        }
+      }
+    }
+
+    void pollResearchStatus();
+    intervalId = window.setInterval(() => {
+      void pollResearchStatus();
+    }, 3000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [researchRun?.id, router]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -331,15 +533,31 @@ export default function DashboardPage() {
                 className="w-full resize-none rounded-lg border border-border bg-background px-3 py-3 text-sm"
               />
 
-              <Button
-                type="submit"
-                disabled={isStartingResearch || !selectedWorkspaceId}
-              >
-                <Activity className="h-4 w-4" />
-                {isStartingResearch
-                  ? "Research in progress..."
-                  : "Start research"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="submit"
+                  disabled={isStartDisabled}
+                >
+                  <Activity className="h-4 w-4" />
+                  {isStartingResearch
+                    ? "Starting..."
+                    : isStartBlockedByRun
+                      ? "Research already running"
+                    : "Start research"}
+                </Button>
+
+                {canStopResearch && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelResearch}
+                    disabled={isCancellingResearch}
+                  >
+                    <Square className="h-4 w-4" />
+                    {isCancellingResearch ? "Stopping..." : "Stop research"}
+                  </Button>
+                )}
+              </div>
             </form>
 
             {isStartingResearch && (
@@ -360,18 +578,30 @@ export default function DashboardPage() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       {researchRun.status}
                     </p>
+                    {researchRun.status === "awaiting_approval" && (
+                      <p className="mt-1 text-sm font-medium text-primary">
+                        Waiting for your approval
+                      </p>
+                    )}
+                    {researchRun.status === "cancelled" && (
+                      <p className="mt-1 text-sm font-medium text-amber-600">
+                        Research stopped by user
+                      </p>
+                    )}
                   </div>
 
                   <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary">
                     {researchRun.id.slice(0, 8)}
                   </span>
                 </div>
-                <Link
-                  href={`/research/${researchRun.id}`}
-                  className="mt-6 inline-flex items-center text-sm font-medium text-primary"
-                >
-                  Review research and report →
-                </Link>
+                {canReviewResearch && (
+                  <Link
+                    href={`/research/${researchRun.id}`}
+                    className="mt-6 inline-flex items-center text-sm font-medium text-primary"
+                  >
+                    Review research and report →
+                  </Link>
+                )}
                 <div className="mt-5 space-y-3">
                   {progressSteps.map((step, index) => (
                     <div
@@ -380,7 +610,8 @@ export default function DashboardPage() {
                     >
                       <span
                         className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                          index <= currentProgress
+                          index <= currentStageProgress.completedThrough ||
+                          index === currentStageProgress.activeIndex
                             ? "bg-primary text-primary-foreground"
                             : "bg-background text-muted-foreground"
                         }`}
@@ -390,7 +621,8 @@ export default function DashboardPage() {
 
                       <span
                         className={
-                          index <= currentProgress
+                          index <= currentStageProgress.completedThrough ||
+                          index === currentStageProgress.activeIndex
                             ? "font-medium"
                             : "text-muted-foreground"
                         }
@@ -398,7 +630,7 @@ export default function DashboardPage() {
                         {step}
                       </span>
 
-                      {index <= currentProgress && (
+                      {index <= currentStageProgress.completedThrough && (
                         <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" />
                       )}
                     </div>

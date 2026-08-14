@@ -1,3 +1,5 @@
+import uuid
+
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command, Send
 
@@ -22,7 +24,13 @@ from app.infrastructure.agents.nodes.verification_agent import (
     verification_agent,
 )
 from app.infrastructure.agents.state import GraphState
+from app.infrastructure.db.models.research_run import ResearchRun
+from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.observability.tracing import traceable_span
+
+
+class ResearchRunCancelledError(Exception):
+    """Raised when a cancelled run attempts to continue graph execution."""
 
 
 def fan_out_research(state: GraphState) -> list[Send]:
@@ -34,6 +42,7 @@ def fan_out_research(state: GraphState) -> list[Send]:
         Send(
             "research_agent",
             {
+                "research_run_id": state["research_run_id"],
                 "sub_question": sub_question,
                 "sub_question_index": index,
             },
@@ -49,48 +58,109 @@ def _trace_node(name: str, node):
     )(node)
 
 
+async def _research_run_is_cancelled(research_run_id: str) -> bool:
+    try:
+        run_uuid = uuid.UUID(research_run_id)
+    except ValueError:
+        return False
+
+    async with AsyncSessionLocal() as db:
+        run = await db.get(ResearchRun, run_uuid)
+
+        if run is None:
+            return False
+
+        return run.status == "cancelled"
+
+
+def _node_with_cancellation_guard(name: str, node):
+    traced_node = _trace_node(name, node)
+
+    async def guarded_node(state: dict) -> dict:
+        research_run_id = state.get("research_run_id")
+
+        if research_run_id and await _research_run_is_cancelled(research_run_id):
+            raise ResearchRunCancelledError(
+                f"Research run {research_run_id} was cancelled",
+            )
+
+        return await traced_node(state)
+
+    return guarded_node
+
+
 def build_graph() -> StateGraph:
     builder = StateGraph(GraphState)
 
     builder.add_node(
         "supervisor_agent",
-        _trace_node("supervisor_agent", supervisor_agent),
+        _node_with_cancellation_guard(
+            "supervisor_agent",
+            supervisor_agent,
+        ),
     )
     builder.add_node(
         "planning_agent",
-        _trace_node("planning_agent", planning_agent),
+        _node_with_cancellation_guard(
+            "planning_agent",
+            planning_agent,
+        ),
     )
     builder.add_node(
         "research_agent",
-        _trace_node("research_agent", research_agent),
+        _node_with_cancellation_guard(
+            "research_agent",
+            research_agent,
+        ),
     )
     builder.add_node(
         "verification_agent",
-        _trace_node("verification_agent", verification_agent),
+        _node_with_cancellation_guard(
+            "verification_agent",
+            verification_agent,
+        ),
     )
     builder.add_node(
         "evidence_agent",
-        _trace_node("evidence_agent", evidence_agent),
+        _node_with_cancellation_guard(
+            "evidence_agent",
+            evidence_agent,
+        ),
     )
     builder.add_node(
         "reasoning_agent",
-        _trace_node("reasoning_agent", reasoning_agent),
+        _node_with_cancellation_guard(
+            "reasoning_agent",
+            reasoning_agent,
+        ),
     )
     builder.add_node(
         "fact_checking_agent",
-        _trace_node("fact_checking_agent", fact_checking_agent),
+        _node_with_cancellation_guard(
+            "fact_checking_agent",
+            fact_checking_agent,
+        ),
     )
     builder.add_node(
         "approval_gate",
-        _trace_node("approval_gate", approval_gate),
+        _node_with_cancellation_guard(
+            "approval_gate",
+            approval_gate,
+        ),
     )
     builder.add_node(
         "report_agent",
-        _trace_node("report_agent", report_agent),
+        _node_with_cancellation_guard(
+            "report_agent",
+            report_agent,
+        ),
     )
     builder.add_node(
         "evaluation_agent",
-        _trace_node("evaluation_agent", evaluation_agent),
+        _node_with_cancellation_guard(
+            "evaluation_agent",
+            evaluation_agent,
+        ),
     )
     builder.set_entry_point("supervisor_agent")
 

@@ -69,3 +69,19 @@ class ResearchRunRepository:
         )
 
         return list(result.scalars().all())
+
+    async def get_active_for_user(
+        self,
+        *,
+        user_id: uuid.UUID,
+        statuses: set[str],
+    ) -> ResearchRun | None:
+        result = await self.session.execute(
+            select(ResearchRun).where(
+                ResearchRun.user_id == user_id,
+                ResearchRun.status.in_(statuses),
+                ResearchRun.deleted_at.is_(None),
+            )
+        )
+
+        return result.scalar_one_or_none()

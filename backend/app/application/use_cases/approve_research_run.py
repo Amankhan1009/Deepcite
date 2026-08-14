@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +7,12 @@ from app.application.use_cases.persist_research_result import (
     persist_evaluation_results,
     persist_report_result,
 )
-from app.infrastructure.agents.graph import approve_research_graph
+from app.infrastructure.agents.graph import (
+    ResearchRunCancelledError,
+    approve_research_graph,
+)
+from app.infrastructure.agents.task_registry import discard as discard_task
+from app.infrastructure.agents.task_registry import register as register_task
 from app.infrastructure.db.models.research_run import ResearchRun
 from app.infrastructure.db.repositories.research_run_repository import (
     ResearchRunRepository,
@@ -41,7 +47,28 @@ async def approve_research_run(
     if run.status != "awaiting_approval":
         raise ResearchRunNotAwaitingApprovalError
 
-    result = await approve_research_graph(str(run.id))
+    graph_task = register_task(str(run.id), approve_research_graph(str(run.id)))
+
+    try:
+        result = await graph_task
+    except ResearchRunCancelledError as error:
+        run.status = "cancelled"
+        await db.commit()
+        await db.close()
+        raise ResearchRunNotAwaitingApprovalError from error
+    except asyncio.CancelledError:
+        if run.status != "cancelled":
+            run.status = "cancelled"
+            await db.commit()
+        await db.close()
+        raise
+    finally:
+        discard_task(str(run.id))
+
+    await db.refresh(run)
+
+    if run.status == "cancelled":
+        raise ResearchRunNotAwaitingApprovalError
 
     if result.get("__interrupt__"):
         raise ResearchRunNotAwaitingApprovalError
