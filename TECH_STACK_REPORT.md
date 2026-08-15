@@ -225,7 +225,7 @@ visible and inspectable.
 | Tool | Role |
 |---|---|
 | **Git / GitHub** | Version control, remote repository |
-| **Codex (VS Code extension)** | AI coding assistant used to implement planned changes |
+
 
 ---
 
