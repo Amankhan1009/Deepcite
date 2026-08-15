@@ -43,6 +43,7 @@ from app.infrastructure.db.repositories.research_run_repository import (
 from app.infrastructure.db.session import get_db
 from app.presentation.api.v1.deps import get_current_user
 from app.presentation.schemas.research import (
+    CitationResponse,
     ReportResponse,
     ResearchRunResponse,
     StartResearchRequest,
@@ -253,4 +254,9 @@ async def get_report(
 
     response = ReportResponse.model_validate(report)
 
-    return response.model_copy(update={"citations": citations})
+    citation_models = [
+        CitationResponse.model_validate(citation)
+        for citation in citations
+    ]
+
+    return response.model_copy(update={"citations": citation_models})   
