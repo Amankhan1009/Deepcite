@@ -617,9 +617,10 @@ async def identify_chartable_data(
             _response_text(response)
         )
 
-    except (APIError, ValueError):
+    except (APIError, ValueError) as exc:
         logger.warning(
-            "Chart identification failed; continuing without chart."
+            "Chart identification failed; continuing without chart: %s",
+            exc,
         )
         return None
 
