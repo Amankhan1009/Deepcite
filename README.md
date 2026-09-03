@@ -255,6 +255,14 @@ docker compose down -v
 
 > ⚠️ `down -v` deletes the local PostgreSQL Docker volume and its stored database data.
 
+### Hosted Backend
+
+The backend is deployed on Render's free tier:
+
+- Backend URL: [https://deepcite-backend.onrender.com/docs](https://deepcite-backend.onrender.com)
+
+> ⚠️ Because this uses Render's free tier, the service may be asleep. If requests fail, wake it up by visiting the URL above and wait a minute for it to start.
+
 ---
 
 ## 💻 Local Development Without Docker
