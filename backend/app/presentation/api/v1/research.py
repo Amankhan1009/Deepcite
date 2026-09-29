@@ -13,6 +13,12 @@ from app.application.use_cases.cancel_research_run import (
     ResearchRunNotCancellableError,
     cancel_research_run,
 )
+from app.application.use_cases.get_research_evidence import (
+    ResearchRunNotFoundError as EvidenceRunNotFoundError,
+)
+from app.application.use_cases.get_research_evidence import (
+    get_research_evidence,
+)
 from app.application.use_cases.get_research_report import (
     ReportNotFoundError,
     get_research_report,
@@ -42,10 +48,6 @@ from app.infrastructure.db.repositories.research_run_repository import (
 )
 from app.infrastructure.db.session import get_db
 from app.presentation.api.v1.deps import get_current_user
-from app.application.use_cases.get_research_evidence import (
-    ResearchRunNotFoundError as EvidenceRunNotFoundError,
-    get_research_evidence,
-)
 from app.presentation.schemas.research import (
     CitationResponse,
     ReportResponse,
