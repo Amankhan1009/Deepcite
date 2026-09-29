@@ -5,7 +5,9 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
+  ExternalLink,
   FileText,
+  XCircle,
   Send,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -23,6 +25,19 @@ type ResearchRun = {
   status: string;
   created_at: string;
 };
+
+type ResearchEvidenceItem = {
+  id: string;
+  source_id?: string | null;
+  source_title?: string | null;
+  source_url: string;
+  source_reliability_score?: number | null;
+  claim_text?: string | null;
+  supporting_evidence?: string | null;
+  verification_status: string;
+  confidence_score?: number | null;
+};
+
 
 type Citation = {
   id: string;
@@ -124,6 +139,23 @@ export default function ResearchDetailPage() {
   const researchId = params.id;
 
   const [researchRun, setResearchRun] = useState<ResearchRun | null>(null);
+  const [evidenceItems, setEvidenceItems] = useState<ResearchEvidenceItem[]>([]);
+  const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
+
+  const loadEvidence = useCallback(async () => {
+    setIsLoadingEvidence(true);
+    try {
+      const items = await apiFetch<ResearchEvidenceItem[]>(
+        `/research/${researchId}/evidence`,
+      );
+      setEvidenceItems(items);
+    } catch {
+      setEvidenceItems([]);
+    } finally {
+      setIsLoadingEvidence(false);
+    }
+  }, [researchId]);
+
   const [report, setReport] = useState<Report | null>(null);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [decision, setDecision] = useState("");
@@ -132,6 +164,30 @@ export default function ResearchDetailPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  async function handleCancel() {
+    setError("");
+    setIsCancelling(true);
+
+    try {
+      const run = await apiFetch<ResearchRun>(
+        `/research/${researchId}/cancel`,
+        { method: "POST" },
+      );
+
+      setResearchRun(run);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to cancel research",
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
   const [isResuming, setIsResuming] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -159,8 +215,10 @@ export default function ResearchDetailPage() {
 
     if (run.status === "completed") {
       await loadCompletedReport();
+    } else if (run.status === "awaiting_approval") {
+      await loadEvidence();
     }
-  }, [loadCompletedReport, researchId]);
+  }, [loadCompletedReport, loadEvidence, researchId]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -370,6 +428,24 @@ export default function ResearchDetailPage() {
               </p>
             </div>
 
+            {researchRun.status === "cancelled" && (
+              <section className="mt-8 rounded-2xl border border-destructive/30 bg-card p-6">
+                <h2 className="text-xl font-semibold text-destructive">
+                  Research cancelled
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  This research run was rejected or cancelled. You can return to the
+                  dashboard to submit a new research question.
+                </p>
+                <Link href="/dashboard" className="mt-5 inline-flex">
+                  <Button variant="outline">
+                    <ArrowLeft className="h-4 w-4" />
+                    Start new research
+                  </Button>
+                </Link>
+              </section>
+            )}
+
             {(researchRun.status === "paused" ||
               researchRun.status === "failed") && (
               <section className="mt-8 rounded-2xl border border-amber-500/30 bg-card p-6">
@@ -391,19 +467,167 @@ export default function ResearchDetailPage() {
 
             {researchRun.status === "awaiting_approval" && (
               <section className="mt-8 rounded-2xl border border-primary/30 bg-card p-6">
-                <h2 className="text-xl font-semibold">Approval required</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  The research evidence has been assembled. Approve this run
-                  to resume report generation.
-                </p>
-                <Button
-                  className="mt-5"
-                  onClick={handleApprove}
-                  disabled={isApproving}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {isApproving ? "Approving..." : "Approve research"}
-                </Button>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      Research Evidence Review
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Deepcite has completed research and evidence verification.
+                      Review the collected evidence before approving the research.
+                    </p>
+                  </div>
+                  {evidenceItems.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {evidenceItems.length}{" "}
+                      {evidenceItems.length === 1 ? "Item" : "Items"} Verified
+                    </span>
+                  )}
+                </div>
+
+                {isLoadingEvidence ? (
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Loading evidence for review...
+                  </p>
+                ) : evidenceItems.length > 0 ? (
+                  <div className="mt-6 space-y-4">
+                    {evidenceItems.map((item, idx) => {
+                      const isVerified =
+                        item.verification_status === "verified" ||
+                        item.verification_status === "supported";
+
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className="rounded-xl border border-border bg-muted/30 p-5 transition-colors"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 ${
+                                  isVerified
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                }`}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {isVerified
+                                  ? "Verified Source"
+                                  : item.verification_status || "Unverified"}
+                              </span>
+                              {item.source_title && (
+                                <span className="text-sm font-medium text-foreground">
+                                  {item.source_title}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {item.source_reliability_score !== null &&
+                                item.source_reliability_score !== undefined && (
+                                  <span>
+                                    Reliability:{" "}
+                                    {item.source_reliability_score.toFixed(2)}
+                                  </span>
+                                )}
+                              {item.confidence_score !== null &&
+                                item.confidence_score !== undefined && (
+                                  <span>
+                                    Confidence:{" "}
+                                    {item.confidence_score.toFixed(2)}
+                                  </span>
+                                )}
+                            </div>
+                          </div>
+
+                          {item.source_url && (
+                            <div className="mt-3">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Source URL
+                              </span>
+                              <a
+                                href={item.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-0.5 flex items-center gap-1 break-words text-sm text-primary hover:underline"
+                              >
+                                {item.source_url}
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                              </a>
+                            </div>
+                          )}
+
+                          {item.claim_text && (
+                            <div className="mt-4">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Finding / Claim
+                              </span>
+                              <p className="mt-1 text-sm font-medium text-foreground leading-relaxed">
+                                {item.claim_text}
+                              </p>
+                            </div>
+                          )}
+
+                          {item.supporting_evidence && (
+                            <div className="mt-4">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Supporting Evidence
+                              </span>
+                              <div className="mt-1.5 rounded-lg bg-card p-3.5 border border-border text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                                {item.supporting_evidence}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex items-center justify-between pt-3 border-t border-border/50 text-xs text-muted-foreground">
+                            <span>
+                              Verification:{" "}
+                              {isVerified
+                                ? "✓ Verified"
+                                : item.verification_status}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                    The research evidence has been assembled. Review and approve to proceed to report generation.
+                  </div>
+                )}
+
+                <div className="mt-6 pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground">
+                      Approve Research
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Approve this run to resume report generation.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                      onClick={handleCancel}
+                      disabled={isCancelling || isApproving}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      {isCancelling ? "Rejecting..." : "Reject research"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleApprove}
+                      disabled={isApproving || isCancelling}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      {isApproving ? "Approving..." : "Approve research"}
+                    </Button>
+                  </div>
+                </div>
               </section>
             )}
 

@@ -42,9 +42,14 @@ from app.infrastructure.db.repositories.research_run_repository import (
 )
 from app.infrastructure.db.session import get_db
 from app.presentation.api.v1.deps import get_current_user
+from app.application.use_cases.get_research_evidence import (
+    ResearchRunNotFoundError as EvidenceRunNotFoundError,
+    get_research_evidence,
+)
 from app.presentation.schemas.research import (
     CitationResponse,
     ReportResponse,
+    ResearchEvidenceItemResponse,
     ResearchRunResponse,
     StartResearchRequest,
 )
@@ -260,3 +265,31 @@ async def get_report(
     ]
 
     return response.model_copy(update={"citations": citation_models})   
+
+
+# ============================================================
+# GET RESEARCH EVIDENCE
+# ============================================================
+
+@router.get(
+    "/{research_run_id}/evidence",
+    response_model=list[ResearchEvidenceItemResponse],
+)
+async def get_evidence(
+    research_run_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        evidence = await get_research_evidence(
+            db=db,
+            research_run_id=research_run_id,
+            user_id=current_user.id,
+        )
+    except EvidenceRunNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Research run not found",
+        ) from error
+
+    return evidence

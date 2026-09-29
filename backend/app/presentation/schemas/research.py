@@ -44,3 +44,16 @@ class ReportResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+class ResearchEvidenceItemResponse(BaseModel):
+    id: str
+    source_id: uuid.UUID | None = None
+    source_title: str | None = None
+    source_url: str
+    source_reliability_score: float | None = None
+    claim_text: str | None = None
+    supporting_evidence: str | None = None
+    verification_status: str = "unverified"
+    confidence_score: float | None = None
+
+    model_config = {"from_attributes": True}
