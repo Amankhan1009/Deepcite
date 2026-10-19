@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import uuid
 from datetime import UTC, datetime
 
@@ -51,7 +50,6 @@ async def cancel_research_run(
 
     run.status = "cancelled"
     run.completed_at = datetime.now(UTC)
-    run.completed_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(run)
 

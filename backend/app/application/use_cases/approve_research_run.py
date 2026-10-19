@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime, timezone
 import uuid
 from datetime import UTC, datetime
 
@@ -87,7 +86,6 @@ async def approve_research_run(
     )
     run.status = "completed"
     run.completed_at = datetime.now(UTC)
-    run.completed_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.close()
