@@ -56,6 +56,12 @@ function formatDuration(
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
+function formatElapsed(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
 const progressSteps = [
   "Planning",
   "Researching sources",
@@ -171,6 +177,28 @@ export default function DashboardPage() {
   const [lastNonCancelledStatus, setLastNonCancelledStatus] = useState<
     string | null
   >(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!researchRun) return;
+    const isActive =
+      ACTIVE_EXECUTION_STATUSES.includes(
+        researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+      ) && researchRun.status !== "awaiting_approval";
+
+    if (!isActive) return;
+
+    const startTimestamp = researchRun.started_at
+      ? new Date(researchRun.started_at).getTime()
+      : new Date(researchRun.created_at).getTime();
+
+    const timerId = window.setInterval(() => {
+      const now = Date.now();
+      setElapsedSeconds(Math.max(0, Math.floor((now - startTimestamp) / 1000)));
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [researchRun]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -278,6 +306,7 @@ export default function DashboardPage() {
       if (run.status !== "cancelled") {
         setLastNonCancelledStatus(run.status);
       }
+      router.push(`/research/${run.id}`);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -345,9 +374,6 @@ export default function DashboardPage() {
     CANCELLABLE_STATUSES.includes(
       researchRun.status as (typeof CANCELLABLE_STATUSES)[number],
     );
-  const canReviewResearch =
-    researchRun?.status === "awaiting_approval" ||
-    researchRun?.status === "completed";
 
   useEffect(() => {
     const currentResearchRunId = researchRun?.id;
@@ -601,6 +627,15 @@ export default function DashboardPage() {
                       <span className="text-sm text-muted-foreground capitalize">
                         {researchRun.status.replace(/_/g, " ")}
                       </span>
+                      {elapsedSeconds !== null && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          <Clock
+                            className="h-3 w-3 animate-spin"
+                            style={{ animationDuration: "4s" }}
+                          />
+                          Elapsed: {formatElapsed(elapsedSeconds)}
+                        </span>
+                      )}
                       {researchRun.status === "completed" &&
                         formatDuration(
                           researchRun.started_at || researchRun.created_at,
@@ -631,47 +666,69 @@ export default function DashboardPage() {
                     {researchRun.id.slice(0, 8)}
                   </span>
                 </div>
-                {canReviewResearch && (
+
+                <div className="mt-4">
                   <Link
                     href={`/research/${researchRun.id}`}
-                    className="mt-6 inline-flex items-center text-sm font-medium text-primary"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
                   >
-                    Review research and report →
+                    <Activity className="h-4 w-4" />
+                    {researchRun.status === "completed"
+                      ? "View Final Report →"
+                      : researchRun.status === "awaiting_approval"
+                        ? "Review Evidence & Approve →"
+                        : "Open Live Research Room →"}
                   </Link>
-                )}
+                </div>
+
                 <div className="mt-5 space-y-3">
-                  {progressSteps.map((step, index) => (
-                    <div
-                      key={step}
-                      className="flex items-center gap-3 text-sm"
-                    >
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                          index <= currentStageProgress.completedThrough ||
-                          index === currentStageProgress.activeIndex
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-background text-muted-foreground"
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
+                  {progressSteps.map((step, index) => {
+                    const isCompleted =
+                      index <= currentStageProgress.completedThrough;
+                    const isActive =
+                      index === currentStageProgress.activeIndex;
 
-                      <span
-                        className={
-                          index <= currentStageProgress.completedThrough ||
-                          index === currentStageProgress.activeIndex
-                            ? "font-medium"
-                            : "text-muted-foreground"
-                        }
+                    return (
+                      <div
+                        key={step}
+                        className="flex items-center gap-3 text-sm"
                       >
-                        {step}
-                      </span>
+                        <span
+                          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                            isCompleted || isActive
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-muted-foreground"
+                          }`}
+                        >
+                          {index + 1}
+                        </span>
 
-                      {index <= currentStageProgress.completedThrough && (
-                        <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" />
-                      )}
-                    </div>
-                  ))}
+                        <span
+                          className={
+                            isCompleted || isActive
+                              ? "font-medium"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {step}
+                        </span>
+
+                        {isCompleted && (
+                          <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" />
+                        )}
+
+                        {isActive && (
+                          <span className="ml-auto flex items-center gap-1.5 text-xs font-medium text-primary">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                            </span>
+                            In progress
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

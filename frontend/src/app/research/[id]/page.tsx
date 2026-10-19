@@ -1056,14 +1056,8 @@ export default function ResearchDetailPage() {
                   </div>
 
                   {plan && (
-                    <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
-                      <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider">
-                        <Compass className="h-4 w-4" />
-                        <span>Active Plan: {plan.sub_questions.length} Sub-Questions Deployed</span>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground italic">
-                        &ldquo;{plan.strategy}&rdquo;
-                      </p>
+                    <div className="mt-5">
+                      <ResearchPlanCard plan={plan} />
                     </div>
                   )}
 
