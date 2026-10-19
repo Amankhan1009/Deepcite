@@ -1,5 +1,7 @@
 import asyncio
+from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,11 +54,14 @@ async def create_research_run(
     if active_run is not None:
         raise ResearchRunAlreadyActiveError
 
+    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     run = ResearchRun(
         workspace_id=workspace_id,
         user_id=user_id,
         question=question,
         status="researching",
+        started_at=now,
     )
 
     db.add(run)
@@ -127,16 +132,22 @@ async def execute_research_run(
                 )
 
                 run.status = "completed"
+                run.completed_at = datetime.now(UTC)
+                run.completed_at = datetime.now(timezone.utc)
 
             await db.commit()
 
         except ResearchRunCancelledError:
             run.status = "cancelled"
+            run.completed_at = datetime.now(UTC)
+            run.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
         except asyncio.CancelledError:
             if run.status != "cancelled":
                 run.status = "cancelled"
+                run.completed_at = datetime.now(UTC)
+                run.completed_at = datetime.now(timezone.utc)
                 await db.commit()
             raise
 

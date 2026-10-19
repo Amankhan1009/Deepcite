@@ -5,13 +5,16 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  Clock,
+  Compass,
   Download,
   ExternalLink,
   FileText,
   HelpCircle,
   MinusCircle,
-  XCircle,
+  RefreshCw,
   Send,
+  XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -26,6 +29,16 @@ type ResearchRun = {
   workspace_id: string;
   question: string;
   status: string;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+type ResearchPlan = {
+  id: string;
+  research_run_id: string;
+  strategy: string;
+  sub_questions: string[];
   created_at: string;
 };
 
@@ -89,30 +102,157 @@ type Evaluation = {
   created_at: string;
 };
 
-const progressSteps = [
-  "Planning",
-  "Researching sources",
-  "Verifying evidence",
-  "Generating report",
+const ACTIVE_EXECUTION_STATUSES = [
+  "planning",
+  "researching",
+  "verifying",
+  "reasoning",
+  "fact_checking",
+  "generating_report",
+] as const;
+
+const detailedProgressSteps = [
+  {
+    statusKey: "planning",
+    label: "Supervisor & Planning Agent",
+    description:
+      "Decomposes the research question into targeted sub-questions and formulates strategy.",
+  },
+  {
+    statusKey: "researching",
+    label: "Research Agent (Tavily MCP)",
+    description:
+      "Searches the live web and extracts authoritative external sources across domains.",
+  },
+  {
+    statusKey: "verifying",
+    label: "Verification & Evidence Agent",
+    description:
+      "Evaluates source reliability scores and extracts verbatim empirical evidence.",
+  },
+  {
+    statusKey: "reasoning",
+    label: "Reasoning & Fact-Checking Agents",
+    description:
+      "Synthesizes multi-source conclusions and performs claim verification.",
+  },
+  {
+    statusKey: "awaiting_approval",
+    label: "Human-in-the-Loop Approval Gate",
+    description:
+      "Operator reviews verified claims and evidence before authorizing final report generation.",
+  },
+  {
+    statusKey: "generating_report",
+    label: "Report & Evaluation Agents",
+    description:
+      "Assembles deep 7-section report, maps citations, and scores groundedness & completeness.",
+  },
 ];
 
-function progressIndex(status: string) {
-  if (status === "planning") return 0;
-
-  if (
-    status === "researching" ||
-    status === "verifying" ||
-    status === "reasoning" ||
-    status === "fact_checking"
-  ) {
-    return 1;
+function getActiveStepIndex(status: string): number {
+  switch (status) {
+    case "planning":
+      return 0;
+    case "researching":
+      return 1;
+    case "verifying":
+      return 2;
+    case "reasoning":
+    case "fact_checking":
+      return 3;
+    case "awaiting_approval":
+      return 4;
+    case "generating_report":
+      return 5;
+    case "completed":
+      return 6;
+    default:
+      return 1;
   }
+}
 
-  if (status === "generating_report" || status === "completed") {
-    return 3;
+function getStepMeta(status: string): { title: string; subtitle: string } {
+  switch (status) {
+    case "planning":
+      return {
+        title: "Planning Research Strategy",
+        subtitle:
+          "Analyzing question, setting constraints, and decomposing into sub-questions...",
+      };
+    case "researching":
+      return {
+        title: "Gathering Authoritative Sources",
+        subtitle:
+          "Running web & Tavily MCP search across academic and industry domains...",
+      };
+    case "verifying":
+      return {
+        title: "Verifying Sources & Evidence",
+        subtitle:
+          "Assessing domain authority, SSL certificates, and extracting verified evidence...",
+      };
+    case "reasoning":
+      return {
+        title: "Synthesizing Cross-Source Findings",
+        subtitle:
+          "Correlating multi-source findings and formulating synthesized conclusions...",
+      };
+    case "fact_checking":
+      return {
+        title: "Calibrated Claim Fact-Checking",
+        subtitle:
+          "Verifying each reasoning conclusion against extracted evidence snippets...",
+      };
+    case "awaiting_approval":
+      return {
+        title: "Human-in-the-Loop Approval Gate",
+        subtitle:
+          "Research complete. Waiting for your review and approval before generating report.",
+      };
+    case "generating_report":
+      return {
+        title: "Generating Comprehensive Research Report",
+        subtitle:
+          "Synthesizing executive summary, findings, analysis, and citations...",
+      };
+    case "completed":
+      return {
+        title: "Research Completed & Verified",
+        subtitle:
+          "Full report generated with inline citations and evaluation scores.",
+      };
+    default:
+      return {
+        title: "Executing Research",
+        subtitle: "Deepcite agents are processing the research run...",
+      };
   }
+}
 
-  return 0;
+function formatElapsed(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatDuration(
+  startedAt?: string | null,
+  completedAt?: string | null,
+): string {
+  if (!startedAt) return "";
+  const start = new Date(startedAt).getTime();
+  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+  if (isNaN(start) || isNaN(end) || end < start) return "";
+
+  const totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
 function formatScore(score: string | number | null | undefined) {
@@ -205,6 +345,54 @@ function getStatusBadge(status?: string | null) {
   };
 }
 
+function ResearchPlanCard({ plan }: { plan: ResearchPlan | null }) {
+  if (!plan) return null;
+
+  return (
+    <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-card to-transparent p-6 dark:bg-primary/10 transition-all shadow-sm">
+      <div className="flex items-center gap-2.5 text-primary">
+        <Compass className="h-5 w-5 shrink-0" />
+        <h3 className="font-semibold text-base text-foreground">
+          Research Plan & Strategy
+        </h3>
+        <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary border border-primary/20">
+          Decomposition Strategy
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Supervisor Approach
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-foreground font-medium bg-background/80 p-3.5 rounded-xl border border-border/60">
+          {plan.strategy}
+        </p>
+      </div>
+
+      {plan.sub_questions && plan.sub_questions.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Targeted Sub-Questions ({plan.sub_questions.length})
+          </p>
+          <div className="space-y-2">
+            {plan.sub_questions.map((subQuestion, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-3 rounded-xl border border-border/60 bg-background/80 p-3 text-sm text-foreground transition-colors hover:border-primary/40"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary mt-0.5">
+                  {idx + 1}
+                </span>
+                <span className="leading-snug">{subQuestion}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ResearchDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -213,6 +401,8 @@ export default function ResearchDetailPage() {
   const [researchRun, setResearchRun] = useState<ResearchRun | null>(null);
   const [evidenceItems, setEvidenceItems] = useState<ResearchEvidenceItem[]>([]);
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
+  const [plan, setPlan] = useState<ResearchPlan | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
 
   const loadEvidence = useCallback(async () => {
     setIsLoadingEvidence(true);
@@ -225,6 +415,17 @@ export default function ResearchDetailPage() {
       setEvidenceItems([]);
     } finally {
       setIsLoadingEvidence(false);
+    }
+  }, [researchId]);
+
+  const loadPlan = useCallback(async () => {
+    try {
+      const loadedPlan = await apiFetch<ResearchPlan | null>(
+        `/research/${researchId}/plan`,
+      );
+      setPlan(loadedPlan);
+    } catch {
+      setPlan(null);
     }
   }, [researchId]);
 
@@ -286,11 +487,13 @@ export default function ResearchDetailPage() {
     setResearchRun(run);
 
     if (run.status === "completed") {
-      await loadCompletedReport();
+      await Promise.all([loadCompletedReport(), loadPlan()]);
     } else if (run.status === "awaiting_approval") {
-      await loadEvidence();
+      await Promise.all([loadEvidence(), loadPlan()]);
+    } else {
+      void loadPlan();
     }
-  }, [loadCompletedReport, loadEvidence, researchId]);
+  }, [loadCompletedReport, loadEvidence, loadPlan, researchId]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -337,7 +540,7 @@ export default function ResearchDetailPage() {
       setResearchRun(run);
 
       if (run.status === "completed") {
-        await loadCompletedReport();
+        await Promise.all([loadCompletedReport(), loadPlan()]);
       }
     } catch (requestError) {
       setError(
@@ -363,7 +566,7 @@ export default function ResearchDetailPage() {
       setResearchRun(run);
 
       if (run.status === "completed") {
-        await loadCompletedReport();
+        await Promise.all([loadCompletedReport(), loadPlan()]);
       }
     } catch (requestError) {
       setError(
@@ -375,6 +578,77 @@ export default function ResearchDetailPage() {
       setIsApproving(false);
     }
   }
+
+  // Auto-polling while research execution is active
+  useEffect(() => {
+    if (!researchRun) return;
+    const isActive = ACTIVE_EXECUTION_STATUSES.includes(
+      researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+    );
+    if (!isActive) return;
+
+    let isSubscribed = true;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const updated = await apiFetch<ResearchRun>(`/research/${researchId}`);
+        if (!isSubscribed) return;
+        setResearchRun(updated);
+
+        if (updated.status === "completed") {
+          window.clearInterval(intervalId);
+          await Promise.all([loadCompletedReport(), loadPlan()]);
+        } else if (updated.status === "awaiting_approval") {
+          window.clearInterval(intervalId);
+          await Promise.all([loadEvidence(), loadPlan()]);
+        } else if (
+          updated.status === "cancelled" ||
+          updated.status === "failed"
+        ) {
+          window.clearInterval(intervalId);
+        } else {
+          if (!plan) {
+            void loadPlan();
+          }
+        }
+      } catch {
+        // network retry
+      }
+    }, 2000);
+
+    return () => {
+      isSubscribed = false;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    researchId,
+    researchRun,
+    loadCompletedReport,
+    loadEvidence,
+    loadPlan,
+    plan,
+  ]);
+
+  // Live stopwatch while research is actively running
+  useEffect(() => {
+    if (!researchRun) return;
+    const isActive = ACTIVE_EXECUTION_STATUSES.includes(
+      researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+    );
+    if (!isActive) return;
+
+    const startTimestamp = researchRun.started_at
+      ? new Date(researchRun.started_at).getTime()
+      : new Date(researchRun.created_at).getTime();
+
+    const updateTimer = () => {
+      const now = Date.now();
+      setElapsedSeconds(Math.max(0, Math.floor((now - startTimestamp) / 1000)));
+    };
+
+    updateTimer();
+    const timerId = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(timerId);
+  }, [researchRun]);
 
   async function handleDownload(
     exportFormat: "markdown" | "pdf" | "docx",
@@ -441,7 +715,7 @@ export default function ResearchDetailPage() {
   }
 
   const currentProgress = researchRun
-    ? progressIndex(researchRun.status)
+    ? getActiveStepIndex(researchRun.status)
     : -1;
 
   const reportQuality = evaluations.find(
@@ -498,9 +772,57 @@ export default function ResearchDetailPage() {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
                 {researchRun.question}
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Status: {researchRun.status}
-              </p>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary border border-primary/20">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      ACTIVE_EXECUTION_STATUSES.includes(
+                        researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+                      )
+                        ? "bg-amber-500 animate-pulse"
+                        : researchRun.status === "completed"
+                          ? "bg-emerald-500"
+                          : "bg-muted-foreground"
+                    }`}
+                  />
+                  Status: {researchRun.status.replace(/_/g, " ")}
+                </span>
+
+                {/* Active stopwatch timer */}
+                {ACTIVE_EXECUTION_STATUSES.includes(
+                  researchRun.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+                ) &&
+                  elapsedSeconds !== null && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Clock
+                        className="h-3.5 w-3.5 animate-spin"
+                        style={{ animationDuration: "4s" }}
+                      />
+                      Elapsed: {formatElapsed(elapsedSeconds)}
+                    </span>
+                  )}
+
+                {/* Completed total duration */}
+                {researchRun.status === "completed" &&
+                  formatDuration(
+                    researchRun.started_at || researchRun.created_at,
+                    researchRun.completed_at || report?.created_at,
+                  ) && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                      <Clock className="h-3.5 w-3.5" />
+                      Duration:{" "}
+                      {formatDuration(
+                        researchRun.started_at || researchRun.created_at,
+                        researchRun.completed_at || report?.created_at,
+                      )}
+                    </span>
+                  )}
+
+                <span className="text-xs text-muted-foreground">
+                  Created {new Date(researchRun.created_at).toLocaleString()}
+                </span>
+              </div>
             </div>
 
             {researchRun.status === "cancelled" && (
@@ -564,6 +886,10 @@ export default function ResearchDetailPage() {
                       of {evidenceItems.length} Verified
                     </span>
                   )}
+                </div>
+
+                <div className="mt-6">
+                  <ResearchPlanCard plan={plan} />
                 </div>
 
                 {isLoadingEvidence ? (
@@ -702,35 +1028,110 @@ export default function ResearchDetailPage() {
             )}
 
             {!report &&
-              !["awaiting_approval", "paused", "failed"].includes(
+              !["awaiting_approval", "paused", "failed", "cancelled"].includes(
                 researchRun.status,
               ) && (
-                <section className="mt-8 rounded-2xl border border-border bg-card p-6">
-                  <h2 className="font-semibold">Research progress</h2>
-                  <div className="mt-5 space-y-3">
-                    {progressSteps.map((step, index) => (
-                      <div
-                        key={step}
-                        className="flex items-center gap-3 text-sm"
-                      >
-                        <span
-                          className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                            index <= currentProgress
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
+                <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-lg">
+                          {getStepMeta(researchRun.status).title}
+                        </h2>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {getStepMeta(researchRun.status).subtitle}
+                        </p>
+                      </div>
+                    </div>
+                    {elapsedSeconds !== null && (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-xs font-medium text-foreground border border-border shrink-0">
+                        <Clock className="h-3.5 w-3.5 text-primary" />
+                        <span>Elapsed: <strong>{formatElapsed(elapsedSeconds)}</strong></span>
+                      </div>
+                    )}
+                  </div>
+
+                  {plan && (
+                    <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider">
+                        <Compass className="h-4 w-4" />
+                        <span>Active Plan: {plan.sub_questions.length} Sub-Questions Deployed</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground italic">
+                        &ldquo;{plan.strategy}&rdquo;
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-6 space-y-3">
+                    {detailedProgressSteps.map((step, index) => {
+                      const activeIndex = getActiveStepIndex(researchRun.status);
+                      const isCompleted = index < activeIndex;
+                      const isCurrent = index === activeIndex;
+
+                      return (
+                        <div
+                          key={step.statusKey}
+                          className={`flex items-start gap-3.5 p-3.5 rounded-xl transition-all border ${
+                            isCurrent
+                              ? "bg-primary/10 border-primary/30 shadow-sm"
+                              : isCompleted
+                                ? "bg-muted/40 border-border/40"
+                                : "border-transparent opacity-60"
                           }`}
                         >
-                          {index + 1}
-                        </span>
-                        <span>{step}</span>
-                      </div>
-                    ))}
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                              isCurrent
+                                ? "bg-primary text-primary-foreground animate-pulse"
+                                : isCompleted
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              index + 1
+                            )}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`text-sm font-medium ${
+                                  isCurrent ? "text-primary font-semibold" : ""
+                                }`}
+                              >
+                                {step.label}
+                              </span>
+                              {isCurrent && (
+                                <span className="text-xs text-primary font-medium flex items-center gap-1">
+                                  <RefreshCw className="h-3 w-3 animate-spin" /> In progress
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {step.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               )}
 
             {report && (
-              <div className="mt-8 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+              <>
+                <div className="mt-8">
+                  <ResearchPlanCard plan={plan} />
+                </div>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
                 <article className="rounded-2xl border border-border bg-card p-6">
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3">
@@ -931,7 +1332,8 @@ export default function ResearchDetailPage() {
                   </section>
                 </aside>
               </div>
-            )}
+            </>
+          )}
           </>
         )}
       </section>

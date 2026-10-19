@@ -5,6 +5,7 @@ import {
   Activity,
   BarChart3,
   CheckCircle2,
+  Clock,
   FileText,
   FolderKanban,
   LogOut,
@@ -32,7 +33,28 @@ type ResearchRun = {
   question: string;
   status: string;
   created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
 };
+
+function formatDuration(
+  startedAt?: string | null,
+  completedAt?: string | null,
+): string {
+  if (!startedAt) return "";
+  const start = new Date(startedAt).getTime();
+  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+  if (isNaN(start) || isNaN(end) || end < start) return "";
+
+  const totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
 
 const progressSteps = [
   "Planning",
@@ -575,9 +597,24 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-medium">Research status</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {researchRun.status}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground capitalize">
+                        {researchRun.status.replace(/_/g, " ")}
+                      </span>
+                      {researchRun.status === "completed" &&
+                        formatDuration(
+                          researchRun.started_at || researchRun.created_at,
+                          researchRun.completed_at,
+                        ) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            <Clock className="h-3 w-3" />
+                            {formatDuration(
+                              researchRun.started_at || researchRun.created_at,
+                              researchRun.completed_at,
+                            )}
+                          </span>
+                        )}
+                    </div>
                     {researchRun.status === "awaiting_approval" && (
                       <p className="mt-1 text-sm font-medium text-primary">
                         Waiting for your approval

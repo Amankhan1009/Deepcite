@@ -19,6 +19,12 @@ from app.application.use_cases.get_research_evidence import (
 from app.application.use_cases.get_research_evidence import (
     get_research_evidence,
 )
+from app.application.use_cases.get_research_plan import (
+    ResearchRunNotFoundError as PlanRunNotFoundError,
+)
+from app.application.use_cases.get_research_plan import (
+    get_research_plan,
+)
 from app.application.use_cases.get_research_report import (
     ReportNotFoundError,
     get_research_report,
@@ -52,6 +58,7 @@ from app.presentation.schemas.research import (
     CitationResponse,
     ReportResponse,
     ResearchEvidenceItemResponse,
+    ResearchPlanResponse,
     ResearchRunResponse,
     StartResearchRequest,
 )
@@ -295,3 +302,34 @@ async def get_evidence(
         ) from error
 
     return evidence
+
+
+# ============================================================
+# GET RESEARCH PLAN
+# ============================================================
+
+@router.get(
+    "/{research_run_id}/plan",
+    response_model=ResearchPlanResponse | None,
+)
+async def get_plan(
+    research_run_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        plan = await get_research_plan(
+            db=db,
+            research_run_id=research_run_id,
+            user_id=current_user.id,
+        )
+    except PlanRunNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Research run not found",
+        ) from error
+
+    if plan is None:
+        return None
+
+    return ResearchPlanResponse.model_validate(plan)

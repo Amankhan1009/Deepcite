@@ -1,4 +1,6 @@
+from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +50,8 @@ async def cancel_research_run(
         raise ResearchRunNotCancellableError
 
     run.status = "cancelled"
+    run.completed_at = datetime.now(UTC)
+    run.completed_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(run)
 

@@ -16,6 +16,18 @@ class ResearchRunResponse(BaseModel):
     question: str
     status: str
     created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ResearchPlanResponse(BaseModel):
+    id: uuid.UUID
+    research_run_id: uuid.UUID
+    strategy: str
+    sub_questions: list[str]
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
