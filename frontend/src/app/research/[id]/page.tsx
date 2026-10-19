@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Download,
   ExternalLink,
   FileText,
+  HelpCircle,
+  MinusCircle,
   XCircle,
   Send,
 } from "lucide-react";
@@ -73,6 +76,15 @@ type Evaluation = {
     target_word_count?: number;
     citation_count?: number;
     missing_sections?: string[];
+    present_sections?: string[];
+    present_section_count?: number;
+    required_section_count?: number;
+    metric_name?: string;
+    total_claims?: number;
+    supported_count?: number;
+    partially_supported_count?: number;
+    unsupported_count?: number;
+    contradicted_count?: number;
   };
   created_at: string;
 };
@@ -131,6 +143,66 @@ function filterReportCitationMarkers(
       allowedMarkers.has(marker) ? `[Source ${marker}]` : ""
     ),
   );
+}
+
+function getStatusBadge(status?: string | null) {
+  const norm = (status || "").toLowerCase().trim();
+  if (norm === "supported" || norm === "verified") {
+    return {
+      label: "Verified Support",
+      icon: CheckCircle2,
+      className:
+        "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-500/20",
+    };
+  }
+  if (norm === "partially_supported") {
+    return {
+      label: "Partially Supported",
+      icon: AlertCircle,
+      className:
+        "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-500/20",
+    };
+  }
+  if (norm === "uncertain") {
+    return {
+      label: "Uncertain",
+      icon: HelpCircle,
+      className:
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-400/20",
+    };
+  }
+  if (norm === "contradicted") {
+    return {
+      label: "Contradicted",
+      icon: XCircle,
+      className:
+        "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-500/20",
+    };
+  }
+  if (norm === "unsupported") {
+    return {
+      label: "Unsupported",
+      icon: XCircle,
+      className:
+        "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-500/20",
+    };
+  }
+  if (norm === "irrelevant") {
+    return {
+      label: "Irrelevant",
+      icon: MinusCircle,
+      className:
+        "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-400 border border-slate-500/20",
+    };
+  }
+  return {
+    label:
+      norm
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()) || "Unverified",
+    icon: HelpCircle,
+    className: "bg-muted text-muted-foreground border border-border",
+  };
 }
 
 export default function ResearchDetailPage() {
@@ -375,6 +447,9 @@ export default function ResearchDetailPage() {
   const reportQuality = evaluations.find(
     (evaluation) => evaluation.dimension === "report_quality",
   );
+  const claimSupport = evaluations.find(
+    (evaluation) => evaluation.dimension === "claim_support",
+  );
   const renderedReportMarkdown = report
     ? filterReportCitationMarkers(
         report.content_markdown,
@@ -478,10 +553,15 @@ export default function ResearchDetailPage() {
                     </p>
                   </div>
                   {evidenceItems.length > 0 && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {evidenceItems.length}{" "}
-                      {evidenceItems.length === 1 ? "Item" : "Items"} Verified
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary border border-primary/20 shrink-0">
+                      {
+                        evidenceItems.filter(
+                          (i) =>
+                            i.verification_status === "verified" ||
+                            i.verification_status === "supported",
+                        ).length
+                      }{" "}
+                      of {evidenceItems.length} Verified
                     </span>
                   )}
                 </div>
@@ -493,9 +573,8 @@ export default function ResearchDetailPage() {
                 ) : evidenceItems.length > 0 ? (
                   <div className="mt-6 space-y-4">
                     {evidenceItems.map((item, idx) => {
-                      const isVerified =
-                        item.verification_status === "verified" ||
-                        item.verification_status === "supported";
+                      const statusInfo = getStatusBadge(item.verification_status);
+                      const StatusIcon = statusInfo.icon;
 
                       return (
                         <div
@@ -505,16 +584,10 @@ export default function ResearchDetailPage() {
                           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
                             <div className="flex items-center gap-2">
                               <span
-                                className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 ${
-                                  isVerified
-                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                                }`}
+                                className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 ${statusInfo.className}`}
                               >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                {isVerified
-                                  ? "Verified Source"
-                                  : item.verification_status || "Unverified"}
+                                <StatusIcon className="h-3.5 w-3.5" />
+                                {statusInfo.label}
                               </span>
                               {item.source_title && (
                                 <span className="text-sm font-medium text-foreground">
@@ -582,10 +655,7 @@ export default function ResearchDetailPage() {
 
                           <div className="mt-4 flex items-center justify-between pt-3 border-t border-border/50 text-xs text-muted-foreground">
                             <span>
-                              Verification:{" "}
-                              {isVerified
-                                ? "✓ Verified"
-                                : item.verification_status}
+                              Status: {statusInfo.label}
                             </span>
                           </div>
                         </div>
@@ -711,17 +781,25 @@ export default function ResearchDetailPage() {
 
                 <aside className="space-y-6">
                   <section className="rounded-2xl border border-border bg-card p-6">
-                    <h2 className="font-semibold">Report quality</h2>
+                    <h2 className="font-semibold">Report completeness</h2>
                     <p className="mt-4 text-3xl font-semibold text-primary">
                       {formatScore(reportQuality?.score)}
                     </p>
                     {reportQuality ? (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {reportQuality.details.word_count ?? 0} /{" "}
-                        {reportQuality.details.target_word_count ?? 1200} words
-                        {" · "}
-                        {reportQuality.details.citation_count ?? 0} citation markers
-                      </p>
+                      <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                        <p>
+                          {reportQuality.details.word_count ?? 0} /{" "}
+                          {reportQuality.details.target_word_count ?? 1500} words
+                          {" · "}
+                          {reportQuality.details.present_section_count ?? 0} /{" "}
+                          {reportQuality.details.required_section_count ?? 7} sections
+                          {" · "}
+                          {reportQuality.details.citation_count ?? 0} citations
+                        </p>
+                        <p className="text-xs text-muted-foreground/80">
+                          Deterministic structural completeness: word count, section coverage, and citation presence. Evaluates formatting structure, not factual truth.
+                        </p>
+                      </div>
                     ) : (
                       <p className="mt-1 text-sm text-muted-foreground">
                         Evaluation is unavailable for this run.
@@ -730,15 +808,30 @@ export default function ResearchDetailPage() {
                   </section>
 
                   <section className="rounded-2xl border border-border bg-card p-6">
-                    <h2 className="font-semibold">Internal confidence</h2>
+                    <h2 className="font-semibold">Claim support & confidence</h2>
                     <p className="mt-4 text-3xl font-semibold text-primary">
-                      {formatScore(report.overall_confidence_score)}
+                      {formatScore(
+                        claimSupport?.score ?? report.overall_confidence_score,
+                      )}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Internal score derived from fact-check outcomes and source
-                      reliability. It is deterministic and project-specific,
-                      not a universal benchmark.
-                    </p>
+                    <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      {claimSupport?.details &&
+                      claimSupport.details.total_claims ? (
+                        <p>
+                          {claimSupport.details.supported_count ?? 0} supported
+                          {" · "}
+                          {claimSupport.details.partially_supported_count ?? 0}{" "}
+                          partially supported
+                          {" · "}
+                          {claimSupport.details.unsupported_count ?? 0} unsupported
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground/80">
+                        Derived from fact-check verification and source
+                        reliability. This reflects internal evidence matching,
+                        not absolute real-world truth.
+                      </p>
+                    </div>
                   </section>
 
                   <section className="rounded-2xl border border-border bg-card p-6">

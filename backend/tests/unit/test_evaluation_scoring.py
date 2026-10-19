@@ -1,7 +1,9 @@
 from app.domain.services.evaluation_scoring import (
     average_source_reliability,
     calculate_citation_coverage,
+    calculate_claim_support,
     calculate_overall_research_quality,
+    calculate_report_quality,
     clamp_evaluation_score,
 )
 
@@ -79,3 +81,53 @@ def test_overall_quality_ignores_existing_overall_dimension():
     )
 
     assert score == 0.85
+
+
+def test_calculate_report_quality_identifies_completeness():
+    markdown = """# Research Findings
+## Methodology
+We collected empirical papers.
+
+## Key Findings
+Finding 1 [Source 1].
+Finding 2 [Source 2].
+
+## Analysis
+Comparative synthesis here.
+
+## Limitations
+Some boundaries exist.
+
+## Recommendations
+Future direction here.
+"""
+    result = calculate_report_quality(
+        report_markdown=markdown,
+        executive_summary="Summary of findings.",
+    )
+    assert result["metric_name"] == "report_completeness"
+    assert result["executive_summary_present"] is True
+    assert result["present_section_count"] == 6
+    assert result["score"] > 0.0
+
+
+def test_calculate_claim_support_weighted_breakdown():
+    fact_checks = [
+        {"status": "supported"},
+        {"status": "partially_supported"},
+        {"status": "unsupported"},
+        {"status": "contradicted"},
+    ]
+    result = calculate_claim_support(fact_checks)
+    assert result["score"] == 0.375
+    assert result["total_claims"] == 4
+    assert result["supported_count"] == 1
+    assert result["partially_supported_count"] == 1
+    assert result["unsupported_count"] == 1
+    assert result["contradicted_count"] == 1
+
+
+def test_calculate_claim_support_empty_returns_none():
+    result = calculate_claim_support([])
+    assert result["score"] is None
+    assert result["total_claims"] == 0

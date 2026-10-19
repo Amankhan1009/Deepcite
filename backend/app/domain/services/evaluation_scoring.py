@@ -206,9 +206,59 @@ def calculate_report_quality(
         "present_sections": present_sections,
         "missing_sections": missing_sections,
         "executive_summary_present": bool(normalized_summary),
+        "metric_name": "report_completeness",
         "method": (
-            "weighted deterministic score: "
+            "deterministic structural completeness: "
             "45% word count, 40% section coverage, "
-            "15% citation presence"
+            "15% citation presence (evaluates format and structure, not factual truth)"
+        ),
+    }
+
+
+def calculate_claim_support(fact_checks: Iterable[dict]) -> dict:
+    """
+    Calculate the empirical evidence support across reasoning conclusions.
+
+    This measures the proportion of claims supported by verified evidence.
+    It is a deterministic internal heuristic, not a measure of absolute truth.
+    """
+    items = list(fact_checks)
+    if not items:
+        return {
+            "score": None,
+            "total_claims": 0,
+            "supported_count": 0,
+            "partially_supported_count": 0,
+            "unsupported_count": 0,
+            "contradicted_count": 0,
+            "method": "no claims available for empirical evaluation",
+        }
+
+    supported = sum(1 for item in items if item.get("status") == "supported")
+    partially_supported = sum(
+        1 for item in items if item.get("status") == "partially_supported"
+    )
+    unsupported = sum(
+        1 for item in items if item.get("status") in {"unsupported", "uncertain"}
+    )
+    contradicted = sum(
+        1 for item in items if item.get("status") == "contradicted"
+    )
+    total = len(items)
+
+    support_score = clamp_evaluation_score(
+        (supported + 0.5 * partially_supported) / total
+    )
+
+    return {
+        "score": support_score,
+        "total_claims": total,
+        "supported_count": supported,
+        "partially_supported_count": partially_supported,
+        "unsupported_count": unsupported,
+        "contradicted_count": contradicted,
+        "method": (
+            "empirical evidence support: "
+            "(supported + 0.5 * partially_supported) / total claims"
         ),
     }

@@ -64,13 +64,16 @@ async def _research_run_is_cancelled(research_run_id: str) -> bool:
     except ValueError:
         return False
 
-    async with AsyncSessionLocal() as db:
-        run = await db.get(ResearchRun, run_uuid)
+    try:
+        async with AsyncSessionLocal() as db:
+            run = await db.get(ResearchRun, run_uuid)
 
-        if run is None:
-            return False
+            if run is None:
+                return False
 
-        return run.status == "cancelled"
+            return run.status == "cancelled"
+    except Exception:
+        return False
 
 
 def _node_with_cancellation_guard(name: str, node):
@@ -200,18 +203,29 @@ def build_graph() -> StateGraph:
 async def _invoke_graph(
     graph_input: dict | Command | None,
     research_run_id: str,
+    checkpointer=None,
 ) -> dict:
     builder = build_graph()
 
-    async with get_checkpointer() as checkpointer:
+    if checkpointer is not None:
         graph = builder.compile(checkpointer=checkpointer)
-
         config = {
             "configurable": {
                 "thread_id": research_run_id,
             }
         }
+        return await graph.ainvoke(
+            graph_input,
+            config=config,
+        )
 
+    async with get_checkpointer() as cp:
+        graph = builder.compile(checkpointer=cp)
+        config = {
+            "configurable": {
+                "thread_id": research_run_id,
+            }
+        }
         return await graph.ainvoke(
             graph_input,
             config=config,
@@ -221,6 +235,7 @@ async def _invoke_graph(
 async def run_research_graph(
     research_run_id: str,
     question: str,
+    checkpointer=None,
 ) -> dict:
     """Start a new research graph execution."""
 
@@ -240,26 +255,31 @@ async def run_research_graph(
     return await _invoke_graph(
         graph_input=initial_state,
         research_run_id=research_run_id,
+        checkpointer=checkpointer,
     )
 
 
 async def approve_research_graph(
     research_run_id: str,
+    checkpointer=None,
 ) -> dict:
     """Resume the graph after explicit human approval."""
 
     return await _invoke_graph(
         graph_input=Command(resume=True),
         research_run_id=research_run_id,
+        checkpointer=checkpointer,
     )
 
 
 async def resume_research_graph(
     research_run_id: str,
+    checkpointer=None,
 ) -> dict:
     """Resume graph execution from the latest crash-recovery checkpoint."""
 
     return await _invoke_graph(
         graph_input=None,
         research_run_id=research_run_id,
+        checkpointer=checkpointer,
     )

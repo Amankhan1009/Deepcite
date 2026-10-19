@@ -3,6 +3,7 @@ import logging
 from app.domain.services.evaluation_scoring import (
     average_source_reliability,
     calculate_citation_coverage,
+    calculate_claim_support,
     calculate_overall_research_quality,
     calculate_report_quality,
 )
@@ -116,6 +117,17 @@ async def evaluate_research(
             "details": report_quality,
         }
     )
+
+    claim_support = calculate_claim_support(fact_checks)
+
+    if claim_support["score"] is not None:
+        evaluations.append(
+            {
+                "dimension": "claim_support",
+                "score": claim_support["score"],
+                "details": claim_support,
+            }
+        )
 
     try:
         quality_evaluation = await generate_quality_evaluation(

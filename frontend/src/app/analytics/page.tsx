@@ -110,6 +110,15 @@ function formatLatency(milliseconds: number) {
 }
 
 function prettyDimension(value: string) {
+  if (value === "hallucination_detection") {
+    return "Hallucination-Free Rate";
+  }
+  if (value === "report_quality") {
+    return "Report Completeness";
+  }
+  if (value === "claim_support") {
+    return "Claim Support";
+  }
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());

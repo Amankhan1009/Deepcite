@@ -29,7 +29,7 @@ def test_quality_evaluation_payload_is_bounded():
                 "claim_text": "e" * 1_000,
                 "source_index": index,
             }
-            for index in range(15)
+            for index in range(25)
         ],
         reasoning=[
             {
@@ -46,15 +46,15 @@ def test_quality_evaluation_payload_is_bounded():
                 "supporting_evidence_indexes": [index],
                 "contradicting_evidence_indexes": [],
             }
-            for index in range(12)
+            for index in range(15)
         ],
     )
 
     assert len(payload["question"]) <= 1_000
     assert len(payload["report_markdown"]) <= 6_001
-    assert len(payload["evidence"]) == 10
+    assert len(payload["evidence"]) == 16
     assert len(payload["reasoning"]) == 8
-    assert len(payload["fact_checks"]) == 8
+    assert len(payload["fact_checks"]) == 10
     assert all(
         len(item["claim_text"]) <= 351
         for item in payload["evidence"]

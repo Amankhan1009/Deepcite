@@ -135,3 +135,108 @@ async def test_persist_report_result_persists_rendered_chart_asset(tmp_path):
             )
         )
         await session.commit()
+
+
+async def test_persist_report_result_creates_citations_for_referenced_markers():
+    from app.infrastructure.db.models.citation import Citation
+    from app.infrastructure.db.models.claim import Claim
+    from app.infrastructure.db.models.source import Source
+    from app.infrastructure.db.repositories.citation_repository import CitationRepository
+
+    async with AsyncSessionLocal() as session:
+        user = User(
+            email=f"{uuid.uuid4()}@example.com",
+            hashed_password="test-hash",
+        )
+        session.add(user)
+        await session.flush()
+
+        workspace = Workspace(
+            user_id=user.id,
+            name="Citation Test Workspace",
+        )
+        session.add(workspace)
+        await session.flush()
+
+        research_run = ResearchRun(
+            workspace_id=workspace.id,
+            user_id=user.id,
+            question="What is the impact of LLMs?",
+            status="completed",
+        )
+        session.add(research_run)
+        await session.flush()
+
+        source = Source(
+            research_run_id=research_run.id,
+            url="https://arxiv.org/abs/2401.0001",
+            title="LLM Impact Study",
+            reliability_score=0.95,
+        )
+        session.add(source)
+        await session.flush()
+
+        claim = Claim(
+            research_run_id=research_run.id,
+            text="LLMs enhance developer productivity.",
+            supporting_evidence_ids=[],
+            contradicting_evidence_ids=[],
+            fact_check_status="supported",
+            confidence_score=0.85,
+        )
+        session.add(claim)
+        await session.flush()
+
+        result = {
+            "report": {
+                "content_markdown": (
+                    "# Summary\n\n"
+                    "LLMs increase developer productivity by 25% [Source 1]."
+                ),
+                "executive_summary": "Summary of findings [Source 1].",
+            },
+            "sources": [
+                {
+                    "source_index": 0,
+                    "url": "https://arxiv.org/abs/2401.0001",
+                    "title": "LLM Impact Study",
+                }
+            ],
+            "verified_sources": [
+                {
+                    "source_index": 0,
+                    "url": "https://arxiv.org/abs/2401.0001",
+                    "title": "LLM Impact Study",
+                    "reliability_score": 0.95,
+                }
+            ],
+        }
+
+        await persist_report_result(
+            db=session,
+            run=research_run,
+            result=result,
+        )
+
+        report = (
+            await session.execute(
+                select(Report).where(Report.research_run_id == research_run.id)
+            )
+        ).scalar_one()
+
+        citation_repo = CitationRepository(session)
+        citations = await citation_repo.list_for_report(report.id)
+
+        assert len(citations) == 1
+        assert citations[0].inline_marker == "[Source 1]"
+        assert citations[0].source_id == source.id
+        assert citations[0].claim_id == claim.id
+
+        await session.execute(delete(Citation).where(Citation.report_id == report.id))
+        await session.execute(delete(Report).where(Report.id == report.id))
+        await session.execute(delete(Claim).where(Claim.id == claim.id))
+        await session.execute(delete(Source).where(Source.id == source.id))
+        await session.execute(delete(ResearchRun).where(ResearchRun.id == research_run.id))
+        await session.execute(delete(Workspace).where(Workspace.id == workspace.id))
+        await session.execute(delete(User).where(User.id == user.id))
+        await session.commit()

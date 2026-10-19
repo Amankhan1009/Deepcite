@@ -280,14 +280,17 @@ def _referenced_source_positions(
 ) -> set[int]:
     """Return the source positions explicitly cited in report Markdown."""
 
-    return {
-        int(match)
-        for match in re.findall(
-            r"(?:\[|\()Source\s+(\d+)(?:\]|\))",
-            report_markdown,
-            flags=re.IGNORECASE,
-        )
-    }
+    positions = set()
+    matches = re.findall(
+        r"(?:\[|\()(?:Sources?|Ref)\s+([0-9,\s]+)(?:\]|\))",
+        report_markdown,
+        flags=re.IGNORECASE,
+    )
+    for block in matches:
+        for number_str in re.findall(r"\d+", block):
+            positions.add(int(number_str))
+
+    return positions
 
 async def persist_report_result(
     db: AsyncSession,
@@ -361,7 +364,7 @@ async def persist_report_result(
     }
 
     citation_repository = CitationRepository(db)
-    created_citation_keys: set[tuple[uuid.UUID, uuid.UUID]] = set()
+    created_citation_markers: set[str] = set()
 
     # Build mapping from persisted source.id -> selected-report position (1..N)
     from app.domain.services.report_source_selection import (
@@ -378,62 +381,77 @@ async def persist_report_result(
         if norm:
             persisted_by_normalized_url[norm] = src
 
-    selected_position_by_source_id: dict[uuid.UUID, int] = {}
-    for idx, sel in enumerate(selected_report_sources, start=1):
+    # Lookup tables: marker integer -> persisted Source object
+    source_by_marker: dict[int, object] = {}
+
+    # 1. Map by prompt source_index + 1 (e.g. [Source 1], [Source 3])
+    for sel in selected_report_sources:
         norm = _normalized_source_url(sel)
         persisted = persisted_by_normalized_url.get(norm)
         if persisted:
-            selected_position_by_source_id[persisted.id] = idx
+            src_idx = sel.get("source_index")
+            if src_idx is not None:
+                source_by_marker[src_idx + 1] = persisted
 
+    # 2. Map by selected 1-based order (if LLM renumbered sequentially 1..N)
+    for idx, sel in enumerate(selected_report_sources, start=1):
+        norm = _normalized_source_url(sel)
+        persisted = persisted_by_normalized_url.get(norm)
+        if persisted and idx not in source_by_marker:
+            source_by_marker[idx] = persisted
+
+    # 3. Fallback: map by global database position
+    for idx, src in enumerate(sources, start=1):
+        if idx not in source_by_marker:
+            source_by_marker[idx] = src
+
+    # Find the best claim to link to each source
+    # Priority: Claim whose supporting_evidence_ids belongs to this source
+    claim_by_source_id: dict[uuid.UUID, object] = {}
     for claim in claims:
-        for evidence_id in claim.supporting_evidence_ids or []:
-            evidence_item = evidence_by_id.get(
-                uuid.UUID(evidence_id),
-            )
-
-            if evidence_item is None:
+        for evidence_id_str in claim.supporting_evidence_ids or []:
+            try:
+                ev_uuid = uuid.UUID(evidence_id_str)
+            except (ValueError, TypeError):
                 continue
+            ev_item = evidence_by_id.get(ev_uuid)
+            if ev_item and ev_item.source_id not in claim_by_source_id:
+                claim_by_source_id[ev_item.source_id] = claim
 
-            global_position = source_position_by_id.get(
-                evidence_item.source_id,
-            )
+    # Default fallback claim if no claim explicitly linked to a source
+    fallback_claim = claims[0] if claims else None
 
-            selected_position = selected_position_by_source_id.get(
-                evidence_item.source_id
-            )
+    # If claims is completely empty, create a placeholder claim so the FK is satisfied
+    if fallback_claim is None and referenced_source_positions:
+        fallback_claim = await claim_repository.create(
+            research_run_id=run.id,
+            text=f"Research finding for {run.question}",
+            supporting_evidence_ids=[],
+            contradicting_evidence_ids=[],
+            fact_check_status="supported",
+            confidence_score=overall_confidence_score or 0.70,
+        )
 
-            # Accept if either the global persisted position or the report-local
-            # selected position appears in the report's referenced markers.
-            referenced = referenced_source_positions
-            matches_global = (
-                global_position is not None and global_position in referenced
-            )
-            matches_selected = (
-                selected_position is not None and selected_position in referenced
-            )
+    for marker_num in sorted(referenced_source_positions):
+        target_source = source_by_marker.get(marker_num)
+        if target_source is None:
+            continue
 
-            if not (matches_global or matches_selected):
-                continue
+        target_claim = claim_by_source_id.get(target_source.id) or fallback_claim
+        if target_claim is None:
+            continue
 
-            citation_key = (claim.id, evidence_item.source_id)
+        marker_str = f"[Source {marker_num}]"
+        if marker_str in created_citation_markers:
+            continue
 
-            if citation_key in created_citation_keys:
-                continue
-
-            created_citation_keys.add(citation_key)
-
-            # Prefer the marker that actually appears in the report.
-            if matches_global:
-                marker_num = global_position
-            else:
-                marker_num = selected_position
-
-            await citation_repository.create(
-                report_id=report.id,
-                claim_id=claim.id,
-                source_id=evidence_item.source_id,
-                inline_marker=f"[Source {marker_num}]",
-            )
+        created_citation_markers.add(marker_str)
+        await citation_repository.create(
+            report_id=report.id,
+            claim_id=target_claim.id,
+            source_id=target_source.id,
+            inline_marker=marker_str,
+        )
 
 
 async def persist_evaluation_results(

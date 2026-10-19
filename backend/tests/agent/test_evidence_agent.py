@@ -20,9 +20,10 @@ async def test_evidence_agent_extracts_claims_from_source(monkeypatch):
         ]
     )
 
+    mock_generate = AsyncMock(return_value=mock_extraction)
     monkeypatch.setattr(
         "app.infrastructure.agents.nodes.evidence_agent.generate_evidence",
-        AsyncMock(return_value=mock_extraction),
+        mock_generate,
     )
 
     state: GraphState = {
@@ -35,6 +36,7 @@ async def test_evidence_agent_extracts_claims_from_source(monkeypatch):
                 "url": "https://example.com/ai-risks",
                 "title": "Production AI risks",
                 "content": "Example source content.",
+                "sub_question": "What are operational failure modes?",
             }
         ],
         "evidence": None,
@@ -46,3 +48,10 @@ async def test_evidence_agent_extracts_claims_from_source(monkeypatch):
     assert len(result["evidence"]) == 2
     assert result["evidence"][0]["source_index"] == 0
     assert result["evidence"][0]["claim_text"]
+
+    mock_generate.assert_called_once_with(
+        source_title="Production AI risks",
+        source_content="Example source content.",
+        research_question="What are the main risks of production AI systems?",
+        sub_question="What are operational failure modes?",
+    )

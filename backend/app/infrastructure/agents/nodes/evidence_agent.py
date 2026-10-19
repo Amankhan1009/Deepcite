@@ -8,6 +8,8 @@ async def evidence_agent(state: GraphState) -> dict:
     sources = state.get("verified_sources") or state.get("sources") or []
     extracted_evidence: list[dict] = []
 
+    research_question = state.get("question")
+
     for source in sources:
         content = source.get("content", "").strip()
 
@@ -17,6 +19,8 @@ async def evidence_agent(state: GraphState) -> dict:
         extraction = await generate_evidence(
             source_title=source.get("title"),
             source_content=content,
+            research_question=research_question,
+            sub_question=source.get("sub_question"),
         )
 
         for claim_text in extraction.items:

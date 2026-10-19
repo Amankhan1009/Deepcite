@@ -175,3 +175,16 @@ def test_filters_evidence_and_fact_checks_to_selected_sources():
     assert selected_fact_checks[1][
         "contradicting_evidence_indexes"
     ] == []
+
+
+def test_select_report_sources_can_select_up_to_six_diverse_sources():
+    sources = [
+        {
+            "source_index": i,
+            "url": f"https://domain{i}.com/page",
+            "reliability_score": 0.60,
+        }
+        for i in range(8)
+    ]
+    selected = select_report_sources(sources)
+    assert len(selected) == 6

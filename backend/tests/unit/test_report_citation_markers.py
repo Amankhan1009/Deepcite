@@ -22,3 +22,15 @@ def test_referenced_source_positions_ignores_invalid_markers():
     )
 
     assert positions == set()
+
+
+def test_referenced_source_positions_handles_compound_and_multiple_markers():
+    positions = _referenced_source_positions(
+        """
+Finding combined [Sources 1, 2].
+Another combined [Source 3, 4].
+Adjacent [Source 5][Source 6].
+"""
+    )
+
+    assert positions == {1, 2, 3, 4, 5, 6}

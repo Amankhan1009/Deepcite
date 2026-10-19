@@ -44,21 +44,21 @@ INITIAL_RETRY_DELAY_SECONDS = 1.0
 MAX_RETRY_DELAY_SECONDS = 8.0
 QUALITY_EVALUATION_MAX_QUESTION_CHARS = 1_000
 QUALITY_EVALUATION_MAX_REPORT_CHARS = 6_000
-QUALITY_EVALUATION_MAX_EVIDENCE_ITEMS = 10
+QUALITY_EVALUATION_MAX_EVIDENCE_ITEMS = 16
 QUALITY_EVALUATION_MAX_EVIDENCE_CLAIM_CHARS = 350
 QUALITY_EVALUATION_MAX_REASONING_ITEMS = 8
 QUALITY_EVALUATION_MAX_REASONING_ITEM_CHARS = 350
-QUALITY_EVALUATION_MAX_FACT_CHECK_ITEMS = 8
+QUALITY_EVALUATION_MAX_FACT_CHECK_ITEMS = 10
 QUALITY_EVALUATION_MAX_FACT_CHECK_EXPLANATION_CHARS = 350
 REPORT_MAX_COMPLETION_TOKENS = 3200
 REPORT_MAX_QUESTION_CHARS = 1_000
-REPORT_MAX_SOURCES = 3
+REPORT_MAX_SOURCES = 6
 REPORT_MAX_SOURCE_TITLE_CHARS = 180
-REPORT_MAX_EVIDENCE_ITEMS = 8
+REPORT_MAX_EVIDENCE_ITEMS = 16
 REPORT_MAX_EVIDENCE_CLAIM_CHARS = 450
 REPORT_MAX_REASONING_ITEMS = 8
 REPORT_MAX_REASONING_ITEM_CHARS = 450
-REPORT_MAX_FACT_CHECK_ITEMS = 6
+REPORT_MAX_FACT_CHECK_ITEMS = 10
 REPORT_MAX_FACT_CHECK_EXPLANATION_CHARS = 350
 EVIDENCE_MAX_COMPLETION_TOKENS = 1_200
 EVIDENCE_MAX_SOURCE_CHARS = 2_000
@@ -80,7 +80,14 @@ class FactCheckItem(BaseModel):
     """Fact-check result for one reasoning conclusion."""
 
     claim_index: int
-    status: Literal["supported", "contradicted", "uncertain"]
+    status: Literal[
+        "supported",
+        "partially_supported",
+        "contradicted",
+        "unsupported",
+        "irrelevant",
+        "uncertain",
+    ]
     supporting_evidence_indexes: list[int]
     contradicting_evidence_indexes: list[int]
     explanation: str
@@ -96,7 +103,14 @@ class _FactCheckItemWire(BaseModel):
     """Tolerant wire representation used for Groq output."""
 
     claim_index: str
-    status: Literal["supported", "contradicted", "uncertain"]
+    status: Literal[
+        "supported",
+        "partially_supported",
+        "contradicted",
+        "unsupported",
+        "irrelevant",
+        "uncertain",
+    ]
     supporting_evidence_indexes: list[str]
     contradicting_evidence_indexes: list[str]
     explanation: str
@@ -106,7 +120,6 @@ class _FactCheckExtractionWire(BaseModel):
     """Groq wire response for fact checking."""
 
     items: list[_FactCheckItemWire]
-
 
 class ChartSpec(BaseModel):
     """Validated specification for one evidence-based chart."""
@@ -390,25 +403,43 @@ def _truncate_source_for_evidence(source_content: str) -> str:
 async def generate_evidence(
     source_title: str | None,
     source_content: str,
+    *,
+    research_question: str | None = None,
+    sub_question: str | None = None,
 ) -> EvidenceExtraction:
-    """Extract directly supported factual claims from one source."""
+    """Extract directly supported factual claims from one source relevant to the research question."""
 
     client = _get_client()
     title = source_title or "Untitled source"
     bounded_source_content = _truncate_source_for_evidence(source_content)
 
+    query_context = ""
+    if research_question:
+        query_context += f"Research question: {research_question}\n"
+    if sub_question and sub_question != research_question:
+        query_context += f"Target sub-question: {sub_question}\n"
+    if query_context:
+        query_context = f"{query_context.strip()}\n\n"
+
+    prompt = (
+        "Extract up to "
+        f"{EVIDENCE_MAX_ITEMS} directly supported, substantive factual claims from the source "
+        "below that are relevant to the research question.\n"
+        "Guidelines:\n"
+        "- Prioritize empirical findings, data points, verified facts, and substantive conclusions that directly answer the question.\n"
+        "- Do NOT extract methodological boilerplate, table fragments, navigational noise, or limitations paragraphs unless they directly qualify a key finding.\n"
+        "- Do not infer, speculate, or add outside knowledge.\n"
+        "- Return concise, citation-ready claims. Each claim must be short "
+        f"({EVIDENCE_MAX_CLAIM_CHARS} characters or fewer).\n"
+        "- Do not repeat claims.\n\n"
+        f"{query_context}"
+        f"Source title: {title}\n\n"
+        f"Source content:\n{bounded_source_content}"
+    )
+
     response = await _generate_content_with_retry(
         client=client,
-        contents=(
-            "Extract up to "
-            f"{EVIDENCE_MAX_ITEMS} directly supported factual claims from the source "
-            "below. Do not infer, speculate, or add outside knowledge. "
-            "Return concise, citation-ready claims. Each claim must be short "
-            f"({EVIDENCE_MAX_CLAIM_CHARS} characters or fewer). "
-            "Do not repeat claims.\n\n"
-            f"Source title: {title}\n\n"
-            f"Source content:\n{bounded_source_content}"
-        ),
+        contents=prompt,
         response_schema=EvidenceExtraction,
         max_completion_tokens=EVIDENCE_MAX_COMPLETION_TOKENS,
     )
@@ -520,9 +551,13 @@ async def generate_fact_checks(
         "Fact-check each reasoning conclusion against the supplied evidence.\n"
         "Use only the supplied evidence. Do not add outside knowledge.\n"
         "Return exactly one fact-check result for each reasoning conclusion.\n"
-        "Use status supported when the evidence supports the conclusion.\n"
-        "Use status contradicted when the evidence conflicts with it.\n"
-        "Use status uncertain when the evidence is insufficient.\n"
+        "Status definitions:\n"
+        "- supported: The evidence directly and fully confirms the conclusion.\n"
+        "- partially_supported: The evidence supports part of the conclusion or requires essential qualification/context.\n"
+        "- contradicted: The evidence directly refutes or conflicts with the conclusion.\n"
+        "- unsupported: The evidence discusses the topic but lacks sufficient data to confirm or refute it. Set supporting_evidence_indexes to [].\n"
+        "- irrelevant: The evidence snippet does not meaningfully relate to the research question or conclusion. Set supporting_evidence_indexes to [].\n"
+        "- uncertain: The evidence is ambiguous, mixed, or internally inconsistent.\n"
         "Represent claim_index and evidence indexes as strings containing "
         "one integer, such as [\"0\", \"2\"].\n"
         "Never concatenate multiple indexes into one string.\n"
@@ -560,14 +595,20 @@ async def generate_fact_checks(
         if claim_index not in valid_claim_indexes:
             continue
 
+        supporting_indexes = _normalize_source_indexes(
+            item.supporting_evidence_indexes,
+            valid_evidence_indexes,
+        )
+
+        # Programmatic guardrail: irrelevant and unsupported claims cannot carry supporting evidence
+        if item.status in {"unsupported", "irrelevant"}:
+            supporting_indexes = []
+
         fact_check_items.append(
             FactCheckItem(
                 claim_index=claim_index,
                 status=item.status,
-                supporting_evidence_indexes=_normalize_source_indexes(
-                    item.supporting_evidence_indexes,
-                    valid_evidence_indexes,
-                ),
+                supporting_evidence_indexes=supporting_indexes,
                 contradicting_evidence_indexes=_normalize_source_indexes(
                     item.contradicting_evidence_indexes,
                     valid_evidence_indexes,
@@ -863,19 +904,17 @@ async def generate_quality_evaluation(
 
     prompt = (
         "You are an independent research-quality evaluator.\n"
-        "Evaluate only whether the supplied report is grounded in the "
-        "supplied evidence.\n"
+        "Evaluate whether the factual claims in the supplied report are grounded in the "
+        "supplied evidence, reasoning conclusions, and fact-checks.\n"
         "Do not add outside knowledge.\n"
         "Groundedness score must be between 0.0 and 1.0, where 1.0 means "
         "the report's factual statements are fully supported by the evidence.\n"
         "Hallucination detection score must be between 0.0 and 1.0, where "
-        "1.0 means no unsupported factual statements were detected.\n"
-        "List every materially unsupported factual statement. Return an empty "
+        "1.0 means no materially fabricated or unsupported factual claims were detected.\n"
+        "Do not flag standard academic framing, section headings, or synthesis as hallucinations if the underlying factual assertions are grounded.\n"
+        "List only materially fabricated or unsupported factual claims. Return an empty "
         "list when no unsupported statement is found.\n"
-        "Use concise rationales grounded only in the supplied report and "
-        "evidence.\n"
-        "The input may be a bounded representative subset. Do not infer "
-        "support from evidence that was not supplied.\n\n"
+        "Use concise rationales grounded only in the supplied report and evidence.\n\n"
         f"Research question:\n{payload['question']}\n\n"
         f"Report:\n{payload['report_markdown']}\n\n"
         "Reasoning conclusions:\n"
@@ -1058,6 +1097,7 @@ async def generate_report(
         "Use only the supplied sources, evidence, reasoning, and fact-checks.\n"
         "Do not add outside knowledge or filler.\n"
         "Cite each factual statement with [Source X].\n"
+        "If evidence is preliminary, conflicting, or inconclusive, state the uncertainty explicitly rather than asserting unsupported consensus or premature recommendations.\n"
         "Return JSON with:\n"
         "- executive_summary: 120-180 words, no heading\n"
         "- content_markdown: report body with these headings once each:\n"

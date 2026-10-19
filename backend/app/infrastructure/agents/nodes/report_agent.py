@@ -12,9 +12,9 @@ from app.infrastructure.llm.groq_client import (
 )
 from app.infrastructure.visualization.chart_generator import render_chart
 
-REPORT_MAX_SOURCES = 3
-REPORT_MAX_EVIDENCE_ITEMS = 8
-REPORT_MAX_FACT_CHECK_ITEMS = 6
+REPORT_MAX_SOURCES = 6
+REPORT_MAX_EVIDENCE_ITEMS = 16
+REPORT_MAX_FACT_CHECK_ITEMS = 10
 
 
 async def report_agent(state: GraphState) -> dict:

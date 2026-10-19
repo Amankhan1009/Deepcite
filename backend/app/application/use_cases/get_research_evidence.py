@@ -224,10 +224,16 @@ async def get_research_evidence(
                                                 "claim_text"
                                             ),
                                             "verification_status": fc.get(
-                                                "status", "verified"
+                                                "status", "unverified"
                                             ),
-                                            "confidence_score": src.get(
-                                                "reliability_score"
+                                            "confidence_score": (
+                                                float(fc["confidence_score"])
+                                                if fc.get("confidence_score") is not None
+                                                else (
+                                                    float(src["reliability_score"])
+                                                    if src.get("reliability_score") is not None
+                                                    else None
+                                                )
                                             ),
                                         }
                                     )
@@ -244,7 +250,11 @@ async def get_research_evidence(
                                         "verification_status": fc.get(
                                             "status", "unverified"
                                         ),
-                                        "confidence_score": None,
+                                        "confidence_score": (
+                                            float(fc["confidence_score"])
+                                            if fc.get("confidence_score") is not None
+                                            else None
+                                        ),
                                     }
                                 )
 

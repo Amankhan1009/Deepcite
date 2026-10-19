@@ -79,6 +79,7 @@ async def test_evaluate_research_returns_available_dimensions(
         ]
         is True
     )
+    assert evaluations_by_dimension["claim_support"]["score"] == 1.0
     assert evaluations_by_dimension["groundedness"]["score"] == 0.85
     assert (
         evaluations_by_dimension["hallucination_detection"]["score"]
@@ -147,6 +148,7 @@ async def test_evaluate_research_persists_deterministic_scores_when_judge_fails(
     assert "source_reliability" in dimensions
     assert "citation_coverage" in dimensions
     assert "report_quality" in dimensions
+    assert "claim_support" in dimensions
     assert "overall" in dimensions
     assert "groundedness" not in dimensions
     assert "hallucination_detection" not in dimensions

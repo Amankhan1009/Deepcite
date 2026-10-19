@@ -7,19 +7,30 @@ def calculate_claim_confidence(
     supporting_source_reliabilities: Iterable[float],
     contradicting_source_reliabilities: Iterable[float],
 ) -> float:
-    """Calculate a bounded confidence score for one claim."""
+    """Calculate a bounded heuristic confidence score for one claim."""
+
+    normalized_status = str(status or "").strip().lower()
+
+    # Irrelevant claims receive zero confidence and cannot be inflated by supporting sources.
+    if normalized_status == "irrelevant":
+        return 0.0
+
+    if normalized_status == "supported":
+        base_score = 0.80
+    elif normalized_status == "partially_supported":
+        base_score = 0.60
+    elif normalized_status == "uncertain":
+        base_score = 0.50
+    elif normalized_status == "unsupported":
+        base_score = 0.30
+    elif normalized_status == "contradicted":
+        base_score = 0.20
+    else:
+        # Fallback for unverified or unrecognized statuses
+        base_score = 0.40
 
     supporting = list(supporting_source_reliabilities)
     contradicting = list(contradicting_source_reliabilities)
-
-    if status == "supported":
-        base_score = 0.80
-    elif status == "contradicted":
-        base_score = 0.20
-    elif status == "uncertain":
-        base_score = 0.50
-    else:
-        base_score = 0.40
 
     if supporting:
         support_quality = sum(supporting) / len(supporting)
@@ -41,7 +52,7 @@ def calculate_overall_confidence(
 ) -> float | None:
     """Calculate the mean confidence score for a report."""
 
-    values = list(scores)
+    values = [score for score in scores if score is not None]
 
     if not values:
         return None

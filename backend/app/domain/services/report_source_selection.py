@@ -1,8 +1,8 @@
 from urllib.parse import urlparse, urlunparse
 
-REPORT_SOURCE_RELIABILITY_THRESHOLD = 0.70
+REPORT_SOURCE_RELIABILITY_THRESHOLD = 0.50
 MINIMUM_REPORT_SOURCE_COUNT = 2
-MAXIMUM_REPORT_SOURCE_COUNT = 5
+MAXIMUM_REPORT_SOURCE_COUNT = 6
 MAXIMUM_REPORT_SOURCES_PER_DOMAIN = 2
 
 
@@ -118,11 +118,14 @@ def select_report_sources(
     ]
 
     if len(strong_sources) >= MINIMUM_REPORT_SOURCE_COUNT:
-        return _select_diverse_sources(strong_sources)
+        return _select_diverse_sources(
+            strong_sources,
+            maximum_source_count=MAXIMUM_REPORT_SOURCE_COUNT,
+        )
 
     return _select_diverse_sources(
         ranked_sources,
-        maximum_source_count=MINIMUM_REPORT_SOURCE_COUNT,
+        maximum_source_count=MAXIMUM_REPORT_SOURCE_COUNT,
     )
 
 
