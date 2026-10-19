@@ -34,8 +34,10 @@ async def test_groq_client_generates_a_valid_research_plan():
 @pytest.mark.asyncio
 async def test_groq_client_generates_evidence_with_question_context():
     source_content = (
-        "In a 2024 trial across 40 hospitals, clinical decision support AI reduced medication dosing errors by 28%. "
-        "However, alert fatigue increased clinician override rates to 42% for non-critical notifications. "
+        "In a 2024 trial across 40 hospitals, clinical decision support AI "
+        "reduced medication dosing errors by 28%. "
+        "However, alert fatigue increased clinician override rates to 42% for "
+        "non-critical notifications. "
         "Deepcite software disclaimer: All rights reserved 2025. Terms and Conditions apply."
     )
     result = await generate_evidence(
@@ -57,7 +59,10 @@ async def test_groq_client_generates_fact_checks_with_calibrated_statuses():
     evidence = [
         {
             "source_index": 0,
-            "claim_text": "Clinical decision support AI reduced medication dosing errors by 28% across 40 hospitals.",
+            "claim_text": (
+                "Clinical decision support AI reduced medication dosing errors by 28% "
+                "across 40 hospitals."
+            ),
         }
     ]
     result = await generate_fact_checks(

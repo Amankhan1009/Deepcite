@@ -358,11 +358,6 @@ async def persist_report_result(
         evidence_item.id: evidence_item
         for evidence_item in evidence
     }
-    source_position_by_id = {
-        source.id: index + 1
-        for index, source in enumerate(sources)
-    }
-
     citation_repository = CitationRepository(db)
     created_citation_markers: set[str] = set()
 

@@ -146,8 +146,8 @@ async def main():
         print("-" * 76)
 
     # Actual human input prompt
-    print("\n[ACTION REQUIRED]: This is the human approval gate.")
-    choice = input("Approve research findings and proceed to report generation? [Y/n]: ").strip().lower()
+    prompt_msg = "Approve research findings and proceed to report generation? [Y/n]: "
+    choice = input(prompt_msg).strip().lower()
 
     if choice in {"n", "no", "q", "quit"}:
         print("\nResearch run paused by human operator. Aborting report generation.")

@@ -57,9 +57,10 @@ async def main():
             "url": "https://ai.stanford.edu/blog/rag-hallucinations-2024",
             "reliability_score": 0.88,
             "content": (
-                "Retrieval-augmented generation (RAG) reduces factual hallucination rates from 14.2% to 2.8% "
-                "across medical and legal benchmark questions by grounding completions in verified vector embeddings. "
-                "However, retrieval noise and poorly ranked context can reintroduce conflicting information."
+                "Retrieval-augmented generation (RAG) reduces factual hallucination rates "
+                "from 14.2% to 2.8% across medical and legal benchmark questions by grounding "
+                "completions in verified vector embeddings. However, retrieval noise and poorly "
+                "ranked context can reintroduce conflicting information."
             ),
         },
         {
@@ -68,8 +69,9 @@ async def main():
             "url": "https://technologyreview.com/enterprise-rag-evaluation",
             "reliability_score": 0.82,
             "content": (
-                "Hybrid search combining dense semantic vectors with BM25 lexical keyword ranking improves context recall "
-                "to 91% compared to 74% for pure vector search alone in high-throughput enterprise pipelines."
+                "Hybrid search combining dense semantic vectors with BM25 lexical keyword ranking "
+                "improves context recall to 91% compared to 74% for pure vector search alone in "
+                "high-throughput enterprise pipelines."
             ),
         },
         {
@@ -78,8 +80,9 @@ async def main():
             "url": "https://arxiv.org/abs/2403.99999",
             "reliability_score": 0.90,
             "content": (
-                "Hierarchical sentence window chunking preserves 34% more semantic context than fixed 500-token chunks. "
-                "Context compression filters out 40% of irrelevant tokens before generation, reducing token costs."
+                "Hierarchical sentence window chunking preserves 34% more semantic context than "
+                "fixed 500-token chunks. Context compression filters out 40% of irrelevant tokens "
+                "before generation, reducing token costs."
             ),
         },
         {
@@ -88,8 +91,9 @@ async def main():
             "url": "https://acm.org/surveys/rag-verification-layers",
             "reliability_score": 0.85,
             "content": (
-                "Post-generation claim-level verification agents detect remaining hallucinated assertions with 89% precision, "
-                "providing an essential secondary safety layer prior to returning responses to end users."
+                "Post-generation claim-level verification agents detect remaining hallucinated "
+                "assertions with 89% precision, providing an essential secondary safety layer "
+                "prior to returning responses to end users."
             ),
         },
     ]
@@ -145,10 +149,17 @@ async def main():
 
     claim_support = calculate_claim_support(fact_check_items)
     print(f"\nEmpirical Claim Support Score: {claim_support['score']}")
-    print(f"  Breakdown: {claim_support['supported_count']} supported, {claim_support['partially_supported_count']} partially supported, {claim_support['unsupported_count']} unsupported")
+    print(
+        f"  Breakdown: {claim_support['supported_count']} supported, "
+        f"{claim_support['partially_supported_count']} partially supported, "
+        f"{claim_support['unsupported_count']} unsupported"
+    )
 
     selected_sources = select_report_sources(sources)
-    print(f"\nReport Source Selection: {len(selected_sources)} of {len(sources)} sources selected (threshold = 0.50):")
+    print(
+        f"\nReport Source Selection: {len(selected_sources)} of {len(sources)} sources "
+        "selected (threshold = 0.50):"
+    )
     for s in selected_sources:
         print(f"  - [Source {s['source_index'] + 1}] {s['title']}")
 
@@ -180,7 +191,8 @@ async def main():
     print("EVALUATION RESULTS:")
     print(f"  Report Completeness: {completeness['score']}")
     print(f"    Words: {completeness['word_count']} / 1500")
-    print(f"    Sections: {completeness['present_section_count']} / 7 present ({', '.join(completeness['present_sections'])})")
+    present_secs = ", ".join(completeness["present_sections"])
+    print(f"    Sections: {completeness['present_section_count']} / 7 present ({present_secs})")
     print(f"    Citation markers: {completeness['citation_count']}")
     print(f"  Claim Support: {claim_support['score']}")
     print("=" * 70)

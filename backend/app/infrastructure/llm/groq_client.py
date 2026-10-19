@@ -407,7 +407,10 @@ async def generate_evidence(
     research_question: str | None = None,
     sub_question: str | None = None,
 ) -> EvidenceExtraction:
-    """Extract directly supported factual claims from one source relevant to the research question."""
+    """Extract directly supported factual claims from one source.
+
+    Filters extraction to claims relevant to the research question.
+    """
 
     client = _get_client()
     title = source_title or "Untitled source"
@@ -426,8 +429,10 @@ async def generate_evidence(
         f"{EVIDENCE_MAX_ITEMS} directly supported, substantive factual claims from the source "
         "below that are relevant to the research question.\n"
         "Guidelines:\n"
-        "- Prioritize empirical findings, data points, verified facts, and substantive conclusions that directly answer the question.\n"
-        "- Do NOT extract methodological boilerplate, table fragments, navigational noise, or limitations paragraphs unless they directly qualify a key finding.\n"
+        "- Prioritize empirical findings, data points, verified facts, and substantive "
+        "conclusions that directly answer the question.\n"
+        "- Do NOT extract methodological boilerplate, table fragments, navigational noise, "
+        "or limitations paragraphs unless they directly qualify a key finding.\n"
         "- Do not infer, speculate, or add outside knowledge.\n"
         "- Return concise, citation-ready claims. Each claim must be short "
         f"({EVIDENCE_MAX_CLAIM_CHARS} characters or fewer).\n"
@@ -553,10 +558,13 @@ async def generate_fact_checks(
         "Return exactly one fact-check result for each reasoning conclusion.\n"
         "Status definitions:\n"
         "- supported: The evidence directly and fully confirms the conclusion.\n"
-        "- partially_supported: The evidence supports part of the conclusion or requires essential qualification/context.\n"
+        "- partially_supported: The evidence supports part of the conclusion or "
+        "requires essential qualification/context.\n"
         "- contradicted: The evidence directly refutes or conflicts with the conclusion.\n"
-        "- unsupported: The evidence discusses the topic but lacks sufficient data to confirm or refute it. Set supporting_evidence_indexes to [].\n"
-        "- irrelevant: The evidence snippet does not meaningfully relate to the research question or conclusion. Set supporting_evidence_indexes to [].\n"
+        "- unsupported: The evidence discusses the topic but lacks sufficient data to "
+        "confirm or refute it. Set supporting_evidence_indexes to [].\n"
+        "- irrelevant: The evidence snippet does not meaningfully relate to the research "
+        "question or conclusion. Set supporting_evidence_indexes to [].\n"
         "- uncertain: The evidence is ambiguous, mixed, or internally inconsistent.\n"
         "Represent claim_index and evidence indexes as strings containing "
         "one integer, such as [\"0\", \"2\"].\n"
@@ -911,7 +919,8 @@ async def generate_quality_evaluation(
         "the report's factual statements are fully supported by the evidence.\n"
         "Hallucination detection score must be between 0.0 and 1.0, where "
         "1.0 means no materially fabricated or unsupported factual claims were detected.\n"
-        "Do not flag standard academic framing, section headings, or synthesis as hallucinations if the underlying factual assertions are grounded.\n"
+        "Do not flag standard academic framing, section headings, or synthesis as "
+        "hallucinations if the underlying factual assertions are grounded.\n"
         "List only materially fabricated or unsupported factual claims. Return an empty "
         "list when no unsupported statement is found.\n"
         "Use concise rationales grounded only in the supplied report and evidence.\n\n"
@@ -1097,7 +1106,8 @@ async def generate_report(
         "Use only the supplied sources, evidence, reasoning, and fact-checks.\n"
         "Do not add outside knowledge or filler.\n"
         "Cite each factual statement with [Source X].\n"
-        "If evidence is preliminary, conflicting, or inconclusive, state the uncertainty explicitly rather than asserting unsupported consensus or premature recommendations.\n"
+        "If evidence is preliminary, conflicting, or inconclusive, state the uncertainty "
+        "explicitly rather than asserting unsupported consensus or premature recommendations.\n"
         "Return JSON with:\n"
         "- executive_summary: 120-180 words, no heading\n"
         "- content_markdown: report body with these headings once each:\n"
