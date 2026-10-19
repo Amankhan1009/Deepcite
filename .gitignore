@@ -17,6 +17,7 @@ frontend/.env.local
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+*.tsbuildinfo
 
 # Docker/local data
 *.log
