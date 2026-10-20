@@ -379,21 +379,21 @@ async def persist_report_result(
     # Lookup tables: marker integer -> persisted Source object
     source_by_marker: dict[int, object] = {}
 
-    # 1. Map by prompt source_index + 1 (e.g. [Source 1], [Source 3])
+    # 1. Map by selected 1-based order (primary: [Source 1], [Source 2], etc.)
+    for idx, sel in enumerate(selected_report_sources, start=1):
+        norm = _normalized_source_url(sel)
+        persisted = persisted_by_normalized_url.get(norm)
+        if persisted:
+            source_by_marker[idx] = persisted
+
+    # 2. Map by prompt source_index + 1 if available and not yet mapped
     for sel in selected_report_sources:
         norm = _normalized_source_url(sel)
         persisted = persisted_by_normalized_url.get(norm)
         if persisted:
             src_idx = sel.get("source_index")
-            if src_idx is not None:
+            if src_idx is not None and (src_idx + 1) not in source_by_marker:
                 source_by_marker[src_idx + 1] = persisted
-
-    # 2. Map by selected 1-based order (if LLM renumbered sequentially 1..N)
-    for idx, sel in enumerate(selected_report_sources, start=1):
-        norm = _normalized_source_url(sel)
-        persisted = persisted_by_normalized_url.get(norm)
-        if persisted and idx not in source_by_marker:
-            source_by_marker[idx] = persisted
 
     # 3. Fallback: map by global database position
     for idx, src in enumerate(sources, start=1):

@@ -20,7 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -268,10 +268,10 @@ function formatScore(score: string | number | null | undefined) {
   return Number.isFinite(value) ? value.toFixed(4) : "—";
 }
 
-function filterReportCitationMarkers(
+function normalizeReportCitations(
   markdown: string,
   citations: Citation[],
-) {
+): { renderedMarkdown: string; displayCitations: Citation[] } {
   const allowedMarkers = new Set(
     citations
       .map((citation) =>
@@ -280,12 +280,58 @@ function filterReportCitationMarkers(
       .filter((marker): marker is string => Boolean(marker)),
   );
 
-  return markdown.replace(
+  const filteredMarkdown = markdown.replace(
     /\[Source\s+(\d+)\]/gi,
     (match, marker: string) => (
       allowedMarkers.has(marker) ? `[Source ${marker}]` : ""
     ),
   );
+
+  const markerNumbers = Array.from(allowedMarkers)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const needsRenumbering =
+    markerNumbers.length > 0 &&
+    (markerNumbers[0] !== 1 ||
+      markerNumbers.some((num, idx) => num !== idx + 1));
+
+  if (!needsRenumbering) {
+    return {
+      renderedMarkdown: filteredMarkdown,
+      displayCitations: citations,
+    };
+  }
+
+  const numToSeq: Record<number, number> = {};
+  markerNumbers.forEach((oldNum, idx) => {
+    numToSeq[oldNum] = idx + 1;
+  });
+
+  const sequentialMarkdown = filteredMarkdown.replace(
+    /\[Source\s+(\d+)\]/gi,
+    (match, markerStr: string) => {
+      const oldNum = parseInt(markerStr, 10);
+      const newNum = numToSeq[oldNum] ?? oldNum;
+      return `[Source ${newNum}]`;
+    },
+  );
+
+  const sequentialCitations = citations.map((citation) => {
+    const match = citation.inline_marker.match(/\[Source\s+(\d+)\]/i);
+    if (!match) return citation;
+    const oldNum = parseInt(match[1], 10);
+    const newNum = numToSeq[oldNum] ?? oldNum;
+    return {
+      ...citation,
+      inline_marker: `[Source ${newNum}]`,
+    };
+  });
+
+  return {
+    renderedMarkdown: sequentialMarkdown,
+    displayCitations: sequentialCitations,
+  };
 }
 
 function getStatusBadge(status?: string | null) {
@@ -837,12 +883,16 @@ export default function ResearchDetailPage() {
   const claimSupport = evaluations.find(
     (evaluation) => evaluation.dimension === "claim_support",
   );
-  const renderedReportMarkdown = report
-    ? filterReportCitationMarkers(
+  const { renderedMarkdown: renderedReportMarkdown, displayCitations } =
+    useMemo(() => {
+      if (!report) {
+        return { renderedMarkdown: "", displayCitations: [] as Citation[] };
+      }
+      return normalizeReportCitations(
         report.content_markdown,
         report.citations,
-      )
-    : "";
+      );
+    }, [report]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -1400,11 +1450,11 @@ export default function ResearchDetailPage() {
 
                   <section className="rounded-2xl border border-border bg-card p-6">
                     <h2 className="font-semibold">
-                      Evidence links ({report.citations.length})
+                      Evidence links ({displayCitations.length})
                     </h2>
 
                     <div className="mt-4 space-y-5">
-                      {report.citations.map((citation) => (
+                      {displayCitations.map((citation) => (
                         <div
                           key={citation.id}
                           className="border-t border-border pt-4 first:border-t-0 first:pt-0"

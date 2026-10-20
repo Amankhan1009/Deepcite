@@ -54,3 +54,44 @@ def test_docx_export_returns_docx_bytes():
     )
     assert extension == "docx"
     assert content.startswith(b"PK")
+
+
+def test_markdown_export_renumbers_gap_citations_sequentially():
+    report = SimpleNamespace(
+        content_markdown=(
+            "# Evidence Grounding\n\n"
+            "Speculative decoding reduces latency [Source 2]. "
+            "Medusa scales memory [Source 4]."
+        ),
+        executive_summary="Summary of findings [Source 2].",
+    )
+    citations = [
+        {
+            "source_id": "src-1",
+            "inline_marker": "[Source 2]",
+            "source_title": "Speculative Decoding Paper",
+            "source_url": "https://arxiv.org/abs/2211.17192",
+        },
+        {
+            "source_id": "src-2",
+            "inline_marker": "[Source 4]",
+            "source_title": "Medusa Paper",
+            "source_url": "https://arxiv.org/abs/2301.12345",
+        },
+    ]
+
+    exportable = ExportableReport(
+        report=report,
+        assets=[],
+        citations=citations,
+    )
+
+    content, media_type, extension = render_report_export(exportable, "markdown")
+    text = content.decode("utf-8")
+
+    assert "[Source 1]" in text
+    assert "[Source 2]" in text
+    assert "[Source 4]" not in text
+    assert "## References" in text
+    assert "[Source 1] Speculative Decoding Paper" in text
+    assert "[Source 2] Medusa Paper" in text

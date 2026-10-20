@@ -174,3 +174,79 @@ async def test_report_agent_generates_chart_asset(monkeypatch, tmp_path):
     assert result["chart_asset"]["file_path"] == str(rendered_path)
     assert rendered_path.exists()
     assert rendered_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+async def test_report_agent_renumbers_sources_sequentially(monkeypatch):
+    captured_sources = []
+    captured_evidence = []
+
+    async def mock_generate_report(question, sources, evidence, reasoning, fact_checks):
+        captured_sources.extend(sources)
+        captured_evidence.extend(evidence)
+        return ReportGeneration(
+            content_markdown="# Report\n\nFinding [Source 1] and [Source 2].",
+            executive_summary="Finding [Source 1] and [Source 2].",
+        )
+
+    monkeypatch.setattr(
+        "app.infrastructure.agents.nodes.report_agent.generate_report",
+        mock_generate_report,
+    )
+    monkeypatch.setattr(
+        "app.infrastructure.agents.nodes.report_agent.identify_chartable_data",
+        AsyncMock(return_value=None),
+    )
+
+    state: GraphState = {
+        "research_run_id": str(uuid.uuid4()),
+        "question": "What is speculative decoding?",
+        "plan": None,
+        # Sources where raw 0 was filtered out/missing, only 2 and 4 exist
+        "sources": [
+            {
+                "source_index": 2,
+                "url": "https://example.com/spec-decoding",
+                "title": "Speculative Decoding Paper",
+                "content": "Speculative decoding accelerates inference.",
+                "reliability_score": 0.95,
+            },
+            {
+                "source_index": 4,
+                "url": "https://example.com/medusa",
+                "title": "Medusa Paper",
+                "content": "Medusa uses multi-head speculation.",
+                "reliability_score": 0.85,
+            },
+        ],
+        "verified_sources": None,
+        "evidence": [
+            {
+                "source_index": 2,
+                "claim_text": "Speculative decoding accelerates inference.",
+            },
+            {
+                "source_index": 4,
+                "claim_text": "Medusa uses multi-head speculation.",
+            },
+        ],
+        "reasoning": {
+            "items": ["Speculative decoding accelerates inference."],
+            "supporting_source_indexes": [2],
+            "contradicting_source_indexes": [],
+        },
+        "fact_checks": {
+            "items": [],
+        },
+        "chart_asset": None,
+        "report": None,
+    }
+
+    result = await report_agent(state)
+
+    assert result["report"] is not None
+    # Verify that captured sources were cleanly renumbered to 0 and 1
+    # which translates to [Source 1] and [Source 2] in the prompt
+    assert [s["source_index"] for s in captured_sources] == [0, 1]
+    assert [e["source_index"] for e in captured_evidence] == [0, 1]
+    assert captured_sources[0]["title"] == "Speculative Decoding Paper"
+    assert captured_sources[1]["title"] == "Medusa Paper"

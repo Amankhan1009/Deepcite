@@ -106,11 +106,62 @@ def _plain_text(value: str) -> str:
     return html.escape(text)
 
 
+def _citation_normalization_map(exportable: ExportableReport) -> dict[int, int]:
+    unique = _unique_citations(exportable)
+    numbers = []
+    for c in unique:
+        marker = c.get("inline_marker") or ""
+        match = re.search(r"\[Source\s+(\d+)\]", marker, re.IGNORECASE)
+        if match:
+            numbers.append(int(match.group(1)))
+
+    unique_sorted = sorted(set(numbers))
+    if not unique_sorted:
+        return {}
+
+    is_already_sequential = (
+        unique_sorted[0] == 1
+        and all(n == i + 1 for i, n in enumerate(unique_sorted))
+    )
+    if is_already_sequential:
+        return {}
+
+    return {old: idx + 1 for idx, old in enumerate(unique_sorted)}
+
+
+def _normalized_report_markdown(exportable: ExportableReport) -> str:
+    content = exportable.report.content_markdown.strip()
+    norm_map = _citation_normalization_map(exportable)
+    if not norm_map:
+        return content
+
+    def replacer(match: re.Match) -> str:
+        old_val = int(match.group(1))
+        new_val = norm_map.get(old_val, old_val)
+        return f"[Source {new_val}]"
+
+    return re.sub(
+        r"\[Source\s+(\d+)\]",
+        replacer,
+        content,
+        flags=re.IGNORECASE,
+    )
+
+
 def _citation_lines(exportable: ExportableReport) -> list[tuple[str, str, str]]:
     lines = []
+    norm_map = _citation_normalization_map(exportable)
 
     for index, citation in enumerate(_unique_citations(exportable), start=1):
-        marker = citation.get("inline_marker") or f"[Source {index}]"
+        raw_marker = citation.get("inline_marker") or f"[Source {index}]"
+        match = re.search(r"\[Source\s+(\d+)\]", raw_marker, re.IGNORECASE)
+        if match and norm_map:
+            old_num = int(match.group(1))
+            new_num = norm_map.get(old_num, old_num)
+            marker = f"[Source {new_num}]"
+        else:
+            marker = raw_marker
+
         title = citation.get("source_title") or "Untitled source"
         url = citation.get("source_url") or ""
 
@@ -120,8 +171,7 @@ def _citation_lines(exportable: ExportableReport) -> list[tuple[str, str, str]]:
 
 
 def render_markdown(exportable: ExportableReport) -> bytes:
-    report = exportable.report
-    sections = [report.content_markdown.strip()]
+    sections = [_normalized_report_markdown(exportable)]
 
     citations = _citation_lines(exportable)
 
@@ -234,7 +284,7 @@ def render_pdf(exportable: ExportableReport) -> bytes:
         Paragraph("Deepcite Research Report", title_style),
     ]
 
-    for raw_line in report.content_markdown.splitlines():
+    for raw_line in _normalized_report_markdown(exportable).splitlines():
         line = raw_line.strip()
 
         if not line:
@@ -336,7 +386,7 @@ def render_docx(exportable: ExportableReport) -> bytes:
 
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 
-    for raw_line in report.content_markdown.splitlines():
+    for raw_line in _normalized_report_markdown(exportable).splitlines():
         line = raw_line.strip()
 
         if not line:

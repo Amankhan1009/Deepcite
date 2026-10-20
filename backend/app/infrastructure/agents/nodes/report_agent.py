@@ -25,29 +25,72 @@ async def report_agent(state: GraphState) -> dict:
     )
     all_evidence = state.get("evidence") or []
 
-    report_sources = select_report_sources(verified_sources)[
+    raw_report_sources = select_report_sources(verified_sources)[
         :REPORT_MAX_SOURCES
     ]
-    report_evidence = filter_evidence_for_sources(
+    raw_report_evidence = filter_evidence_for_sources(
         evidence=all_evidence,
-        selected_sources=report_sources,
+        selected_sources=raw_report_sources,
     )[:REPORT_MAX_EVIDENCE_ITEMS]
+
+    # Map raw source indexes to contiguous 0-based sequential indexes (0..N-1)
+    # so that the report generation prompt and citations always start at [Source 1]
+    # with no missing numbers or offsets.
+    raw_to_seq_source_index: dict[int, int] = {}
+    url_to_seq_source_index: dict[str, int] = {}
+
+    report_sources = []
+    for seq_index, source in enumerate(raw_report_sources):
+        copied = dict(source)
+        raw_idx = source.get("source_index")
+        if raw_idx is not None:
+            raw_to_seq_source_index[raw_idx] = seq_index
+
+        url = str(source.get("url") or "").strip().lower()
+        if url:
+            url_to_seq_source_index[url] = seq_index
+
+        copied["source_index"] = seq_index
+        report_sources.append(copied)
+
+    report_evidence = []
+    for item in raw_report_evidence:
+        copied = dict(item)
+        raw_idx = item.get("source_index")
+        item_url = str(item.get("source_url") or "").strip().lower()
+
+        seq_idx = raw_to_seq_source_index.get(raw_idx)
+        if seq_idx is None and item_url:
+            seq_idx = url_to_seq_source_index.get(item_url)
+        if seq_idx is None:
+            seq_idx = 0
+
+        copied["source_index"] = seq_idx
+        report_evidence.append(copied)
 
     reasoning_data = state.get("reasoning") or {}
     reasoning_items = reasoning_data.get("items") or []
+
+    raw_supporting = reasoning_data.get("supporting_source_indexes", [])
+    raw_contradicting = reasoning_data.get("contradicting_source_indexes", [])
+
+    mapped_supporting = [
+        raw_to_seq_source_index[idx]
+        for idx in raw_supporting
+        if idx in raw_to_seq_source_index
+    ]
+    mapped_contradicting = [
+        raw_to_seq_source_index[idx]
+        for idx in raw_contradicting
+        if idx in raw_to_seq_source_index
+    ]
 
     reasoning = [
         {
             "claim_index": index,
             "text": item,
-            "supporting_source_indexes": reasoning_data.get(
-                "supporting_source_indexes",
-                [],
-            ),
-            "contradicting_source_indexes": reasoning_data.get(
-                "contradicting_source_indexes",
-                [],
-            ),
+            "supporting_source_indexes": mapped_supporting,
+            "contradicting_source_indexes": mapped_contradicting,
         }
         for index, item in enumerate(reasoning_items)
     ]
@@ -57,7 +100,7 @@ async def report_agent(state: GraphState) -> dict:
 
     report_fact_checks = filter_fact_checks_for_evidence(
         fact_checks=all_fact_checks,
-        selected_evidence=report_evidence,
+        selected_evidence=raw_report_evidence,
         all_evidence=all_evidence,
     )[:REPORT_MAX_FACT_CHECK_ITEMS]
 
