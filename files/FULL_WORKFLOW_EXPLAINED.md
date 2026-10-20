@@ -51,51 +51,51 @@ Deepcite treats research not as a text-generation task, but as a **verifiable, m
 
 ```mermaid
 flowchart TD
-    User([User / Browser]) -->|1. Submit Question| API[FastAPI Backend /api/v1/research/start]
-    API -->|Create Run Record| DB[(Neon PostgreSQL)]
-    API -->|Launch Background Task| Graph[LangGraph Research State Machine]
+    User(["User / Browser"]) -->|"1. Submit Question"| API["FastAPI Backend: /api/v1/research/start"]
+    API -->|"Create Run Record"| DB[("Neon PostgreSQL")]
+    API -->|"Launch Background Task"| Graph["LangGraph Research State Machine"]
     
-    subgraph "Stage 1: Planning (~5s)"
-        Graph --> NodePlanning[Planning Agent / Groq Llama 3.3]
-        NodePlanning -->|Persist ResearchPlan Immediately| DB
-        NodePlanning -->|Decomposed Sub-Questions| NodeParallelSearch
+    subgraph S1 ["Stage 1: Planning (~5s)"]
+        Graph --> NodePlanning["Planning Agent / Groq Llama 3.3"]
+        NodePlanning -->|"Persist Plan Immediately"| DB
+        NodePlanning -->|"Decomposed Sub-Questions"| NodeParallelSearch["Parallel Research Workers"]
     end
 
-    subgraph "Stage 2: Parallel Search"
-        NodeParallelSearch[Parallel Research Workers] -->|MCP Stdio Tool| TavilyMCP[Tavily Search MCP Server]
-        TavilyMCP -->|Raw Web Results| NodeParallelSearch
-        NodeParallelSearch -->|Persist Sources| DB
+    subgraph S2 ["Stage 2: Parallel Search"]
+        NodeParallelSearch -->|"MCP Stdio Tool"| TavilyMCP["Tavily Search MCP Server"]
+        TavilyMCP -->|"Raw Web Results"| NodeParallelSearch
+        NodeParallelSearch -->|"Persist Sources"| DB
     end
 
-    subgraph "Stage 3: Verification & Extraction"
-        NodeParallelSearch --> NodeVerification[Verification Agent]
-        NodeVerification -->|Domain Reliability Scoring| DB
-        NodeVerification --> NodeEvidence[Evidence Extraction Agent]
-        NodeEvidence -->|Extract Atomic Claims| DB
+    subgraph S3 ["Stage 3: Verification & Extraction"]
+        NodeParallelSearch --> NodeVerification["Verification Agent"]
+        NodeVerification -->|"Domain Reliability Scoring"| DB
+        NodeVerification --> NodeEvidence["Evidence Extraction Agent"]
+        NodeEvidence -->|"Extract Atomic Claims"| DB
     end
 
-    subgraph "Stage 4: Reasoning & Fact-Checking"
-        NodeEvidence --> NodeReasoning[Reasoning Agent]
-        NodeReasoning --> NodeFactChecker[Fact-Checking Agent]
-        NodeFactChecker -->|Supported / Contradicted / Confidence| DB
+    subgraph S4 ["Stage 4: Reasoning & Fact-Checking"]
+        NodeEvidence --> NodeReasoning["Reasoning Agent"]
+        NodeReasoning --> NodeFactChecker["Fact-Checking Agent"]
+        NodeFactChecker -->|"Supported / Contradicted / Confidence"| DB
     end
 
-    subgraph "Stage 5: Human-in-the-Loop Checkpoint Gate"
-        NodeFactChecker --> GateApproval{Human Approval Gate}
-        GateApproval -->|Save State to Postgres Checkpointer| DB
-        GateApproval -.->|UI: status=awaiting_approval| User
-        User -->|Inspect Evidence Cards & Click Approve| APIApprove[POST /api/v1/research/{id}/approve]
-        APIApprove -->|Resume LangGraph Thread| NodeReport
+    subgraph S5 ["Stage 5: Human-in-the-Loop Checkpoint Gate"]
+        NodeFactChecker --> GateApproval{"Human Approval Gate"}
+        GateApproval -->|"Save State to Postgres Checkpointer"| DB
+        GateApproval -.->|"UI: status=awaiting_approval"| User
+        User -->|"Inspect Evidence & Click Approve"| APIApprove["POST /api/v1/research/:id/approve"]
+        APIApprove -->|"Resume LangGraph Thread"| NodeReport["Report Agent / Groq Llama 3.3"]
     end
 
-    subgraph "Stage 6: Report Synthesis & Evaluation"
-        NodeReport[Report Agent / Groq Llama 3.3] -->|Sequential Citations [Source 1..N]| DB
-        NodeReport --> NodeEvaluation[Evaluation Agent]
-        NodeEvaluation -->|Audit Word Count, Groundedness, Hallucinations| DB
-        NodeReport --> ExportEngine[Export Engine: PDF / DOCX / Markdown]
+    subgraph S6 ["Stage 6: Report Synthesis & Evaluation"]
+        NodeReport -->|"Sequential Citations [Source 1..N]"| DB
+        NodeReport --> NodeEvaluation["Evaluation Agent"]
+        NodeEvaluation -->|"Audit Word Count & Groundedness"| DB
+        NodeReport --> ExportEngine["Export Engine: PDF / DOCX / Markdown"]
     end
 
-    ExportEngine -.->|Download Report| User
+    ExportEngine -.->|"Download Report"| User
 ```
 
 ---
