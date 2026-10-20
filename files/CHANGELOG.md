@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## Milestone 32 — Production deployment, real-time agent visibility, and UX reliability
+
+Completed the final phase of Deepcite production deployment, UX refinement, and live workflow visibility.
+
+- Deployed the Next.js frontend to Vercel at `https://deepcite.vercel.app` with automated GitHub deployments.
+- Deployed the FastAPI/LangGraph backend to Render at `https://deepcite-967b.onrender.com` backed by Neon PostgreSQL.
+- Updated FastAPI CORS policy to dynamically accept all Vercel production and preview deployment URLs.
+- Implemented real-time LangGraph step propagation in the background research runner: research runs now dynamically advance through `planning`, `researching`, `verifying`, `reasoning`, `fact_checking`, `awaiting_approval`, `generating_report`, and `completed`.
+- Implemented immediate database persistence of the `ResearchPlan` (~5s into research execution) so users can inspect the decomposition strategy and sub-questions immediately while research workers fan out.
+- Fixed citation numbering gaps: re-indexed verified report sources cleanly to `[Source 1]..[Source N]` during report generation, updated database citation linking, and added automatic UI and export gap normalization.
+- Integrated human-in-the-loop features across landing, dashboard, and research views, empowering users to intervene and approve or reject claims before report synthesis.
+- Added contextual source reliability badges (`Academic / Peer-Reviewed` and `Verified Web Source`) and intuitive percentage confidence scores (`Confidence: 86%`).
+- Added active run recovery, browser tab status notifications, quick-start research topic chips, and custom Deepcite favicon and branding.
+- Verified all 65 unit and agent tests pass, TypeScript compiles with 0 errors, and ESLint passes with 0 errors.
+
 ## Milestone 27 — Settings, research history, and run selection
 
 Completed the M27 product workflow improvements.

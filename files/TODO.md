@@ -84,7 +84,11 @@ Milestone 31 is complete and verified with GitHub Actions backend lint/tests,
 frontend lint/build, Docker image builds, and Docker Hub publishing after tests
 pass.
 
-## Next milestone
+Milestone 32 is complete and verified with production deployment on Vercel and
+Render, real-time agent execution tracking, immediate research plan persistence,
+human-in-the-loop workflows, and sequential citation renumbering.
+
+## Milestones Summary
 - [x] Complete Milestone 27 — Settings page, research history list/detail views
 - [x] Complete Milestone 28 — Frontend resume workflow for paused/interrupted
       research runs
@@ -93,9 +97,11 @@ pass.
 - [x] Complete Milestone 30 — Docker Compose for local development
 - [x] Complete Milestone 31 — GitHub Actions CI: lint, test, build, Docker
       image publish
-- [ ] Start Milestone 32 — Production deployment, secrets management, final
+- [x] Complete Milestone 32 — Production deployment, secrets management, final
       security pass, portfolio README
 
-## Future report-quality work
+## Future Enhancements
+- [ ] Add deep full-text scraping via Tavily/crawl MCP integration.
 - [ ] Add an optional controlled expansion pass when a generated report still
       lands below the target word-count range.
+- [ ] Multi-tenant workspace member invites and team collaboration.

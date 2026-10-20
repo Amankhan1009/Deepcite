@@ -1,12 +1,12 @@
 # CURRENT_STATE.md
 
-Last updated: Milestone 31 — GitHub Actions CI complete
+Last updated: Milestone 32 — Production Deployment & Real-Time Research Pipeline Complete
 
 ## Status
-Phase 2 (Agent mesh), Phase 3 (Quality layer), Phase 4 (Product layer), and
-Milestones 28-31 in Phase 5 are complete. The backend scaffold, core database
-models, JWT authentication, workspace CRUD, LangGraph skeleton, and Alembic
-migration are in place, with the migration applied to Neon.
+All 5 phases (Phases 1 through 5, Milestones 1 through 32) are complete and
+actively deployed in production. The system is live with frontend hosted on
+Vercel, backend hosted on Render, serverless PostgreSQL on Neon, Tavily MCP
+search integration, LangSmith tracing, and full human-in-the-loop workflows.
 
 ## What exists
 - This documentation set.
@@ -241,19 +241,31 @@ migration are in place, with the migration applied to Neon.
   pushes them to Docker Hub using GitHub Actions repository secrets.
 - M31 verification completed with GitHub Actions passing backend tests,
   frontend checks, Docker image builds, and Docker Hub image publishing.
+- M32 deploys Deepcite live to production with the frontend on Vercel
+  (`https://deepcite.vercel.app`) and the backend on Render (`https://deepcite-967b.onrender.com`).
+- M32 implements real-time LangGraph step propagation in the background research runner.
+  The research run status dynamically reflects the active agent node:
+  `planning` → `researching` → `verifying` → `reasoning` → `fact_checking` →
+  `awaiting_approval` → `generating_report` → `completed`.
+- M32 persists the ResearchPlan immediately into PostgreSQL upon planning completion
+  (~5 seconds into the run), rendering the strategy and sub-questions in the UI
+  while parallel search executes.
+- M32 integrates human-in-the-loop interventions across landing, dashboard, and
+  research views, allowing users to inspect, approve, or reject evidence.
+- M32 standardizes citation numbering: report generation renumbers sources cleanly
+  to `[Source 1]..[Source N]`, and the UI normalizes citation gaps for historical reports.
+- M32 introduces contextual source reliability badges (`Academic / Peer-Reviewed`
+  and `Verified Web Source`) and human-readable percentage confidence scores.
+- M32 adds active research run recovery, tab notifications, topic chips, and
+  custom branding assets (Deepcite tab favicon and app icons).
 
-## What doesn't exist yet
-- True streamed/SSE progress updates; the current M23 UI shows an in-flight
-  loading state and the final status returned by the synchronous backend
-  request. A durable live-progress transport remains a later enhancement.
-- Fetch/scrape MCP integration
-- Original topic-related illustration generation; report exports only include
-  already-persisted safe local assets. New illustration generation remains a
-  future enhancement and must use newly generated visuals rather than copied
-  source-page images.
-- Optional report expansion pass for generated reports that still land below
-  the target word-count range.
+## What doesn't exist yet / Future Enhancements
+- Fetch/scrape MCP integration for deep full-text web scraping.
+- Original topic-related illustration generation; report exports currently include
+  persisted chart assets. New visual generation remains a future enhancement.
+- Optional report expansion pass for generated reports that land below the target
+  word-count range.
 
-## Next milestone
-Milestone 32 — Production deployment, secrets management, final security pass,
-and portfolio README.
+## Next steps
+- Monitor production telemetry and user feedback.
+- Periodic updates to Groq model tags as open-source LLMs evolve.

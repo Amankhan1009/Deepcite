@@ -7,18 +7,18 @@ the only source of truth.
 
 ## Before touching anything
 Read, in this order:
-1. `docs/CURRENT_STATE.md` — what exists right now
-2. `docs/MILESTONES.md` — what's done, what's next
-3. `docs/DECISIONS.md` — why things are the way they are (don't relitigate)
-4. `docs/ARCHITECTURE.md` — system design (frozen unless explicitly approved)
+1. `files/CURRENT_STATE.md` — what exists right now
+2. `files/MILESTONES.md` — what's done, what's next
+3. `files/DECISIONS.md` — why things are the way they are (don't relitigate)
+4. `files/ARCHITECTURE.md` — system design (frozen unless explicitly approved)
 
-Then continue from the next incomplete milestone in `docs/MILESTONES.md`.
+Then continue from the next incomplete milestone in `files/MILESTONES.md`.
 
 ## Project identity
 Production-Grade AI Deep Research Platform. Multi-agent research system
 (planning → parallel research → verification → reasoning → fact-checking →
 report), with evaluation and observability as first-class features, not
-afterthoughts. See `docs/PROJECT_OVERVIEW.md`.
+afterthoughts. See `files/PROJECT_OVERVIEW.md`.
 
 ## Ground rules
 - **Architecture is frozen** once approved (see ARCHITECTURE.md). Do not

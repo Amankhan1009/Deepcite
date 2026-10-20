@@ -1,6 +1,14 @@
-# Backend — Milestone 1
+# Deepcite Backend Service
 
-## Setup
+FastAPI-powered backend orchestrating the evidence-grounded multi-agent research pipeline using LangGraph, PostgreSQL (Neon), Groq, and Tavily MCP.
+
+For complete architectural and engineering documentation, see [`files/README.md`](../files/README.md).
+
+---
+
+## 🚀 Quickstart
+
+### 1. Environment & Dependencies
 
 ```bash
 cd backend
@@ -8,34 +16,40 @@ python3.12 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env: set DATABASE_URL to your Neon connection string
-#   (postgresql+asyncpg://..., no sslmode param, use ?ssl=require)
 ```
 
-## Run the API
+Edit `.env` to configure your API keys (`DATABASE_URL`, `GROQ_API_KEY`, `TAVILY_API_KEY`, `SECRET_KEY`).
+
+### 2. Database Migrations
 
 ```bash
-uvicorn app.main:app --reload
+alembic upgrade head
 ```
 
-Then check:
-```bash
-curl http://127.0.0.1:8000/api/v1/health
-```
-Expect `{"status":"ok","database":"connected"}` once DATABASE_URL points
-at a real reachable Neon database.
-
-## Run tests
+### 3. Run Development Server
 
 ```bash
-pytest
+uvicorn app.main:app --reload --port 8000
 ```
 
-## Run the Gemini spike (separate from the app)
+- API Base URL: `http://localhost:8000/api/v1`
+- Interactive Swagger UI: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/api/v1/health`
+
+---
+
+## 🧪 Testing
 
 ```bash
-export GEMINI_API_KEY=your_key_here
-python ../scripts/gemini_spike.py
+# Run unit and agent tests
+PYTHONPATH=. pytest tests/unit/ tests/agent/
 ```
 
-Paste the output back — it decides the SDK question in DECISIONS.md.
+---
+
+## 🐳 Docker
+
+```bash
+docker build -t deepcite-backend .
+docker run -p 8000:8000 --env-file .env deepcite-backend
+```

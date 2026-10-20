@@ -16,12 +16,24 @@ register/login. All request/response bodies are Pydantic-validated.
 
 ## Research
 - `POST /research/start` — start a research run (workspace ID and question in)
-- `GET /research/{id}` — ownership-protected status and creation timestamp
-- `GET /research/{id}/stream` — SSE/WebSocket for live progress (Phase 4)
-- `POST /research/{id}/approve` — resume a paused-for-approval run
-- `POST /research/{id}/pause` — explicit user-triggered pause (if in scope)
-- `POST /research/{id}/resume` — resume after crash/interruption
-- `GET /workspaces/{id}/research` — history list
+- `GET /research/{id}` — ownership-protected status, active stage, and creation/completion timestamps
+- `GET /research/{id}/plan` — ownership-protected research plan retrieval (decomposition strategy and sub-questions, available ~5s into the run)
+- `GET /research/{id}/evidence` — ownership-protected structured evidence items, claim text, source URLs, reliability scores, and verification status
+- `POST /research/{id}/approve` — resume a paused-for-approval run (proceeds to report synthesis)
+- `POST /research/{id}/pause` — explicit user-triggered pause
+- `POST /research/{id}/resume` — resume after crash/interruption from latest checkpoint
+- `GET /workspaces/{id}/research` — history list of all runs in the workspace
+
+### Research Run Lifecycle Statuses:
+- `planning` — decomposing the question into targeted sub-questions
+- `researching` — parallel web retrieval via Tavily MCP workers
+- `verifying` — calculating domain and source reliability scores
+- `reasoning` — synthesizing claims from verified evidence
+- `fact_checking` — verifying claims against supporting/contradicting evidence
+- `awaiting_approval` — graph paused at human checkpoint for intervention
+- `generating_report` — synthesizing cited Markdown report with Groq
+- `completed` — report generated, evaluated, and ready for review/export
+- `paused` / `failed` — recoverable states eligible for resume
 
 ## Reports
 - `GET /research/{id}/report` — ownership-protected report content,

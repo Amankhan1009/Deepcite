@@ -13,6 +13,10 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
+<br/>
+
+[🌐 **Live Web Application**](https://deepcite.vercel.app) · [⚡ **API & Swagger Docs**](https://deepcite-967b.onrender.com/docs) · [📖 **Engineering Documentation**](files/README.md)
+
 </div>
 
 ---
@@ -96,20 +100,21 @@ The result is a research workflow where you can follow **how the answer was prod
 
 | Capability | What it provides |
 |---|---|
-| 🤖 Multi-Agent Research | Specialized agents for planning, research, evidence, reasoning, verification, and fact-checking |
-| 🔎 Evidence Gathering | Research results are converted into structured evidence |
-| 🛡️ Source Verification | Sources are checked and reliability is incorporated into the workflow |
-| 🧩 Claim Reasoning | Evidence is synthesized into supported claims and conclusions |
-| 👤 Human Approval | Research can pause for human review before report generation |
-| 🔄 Resume-Safe Workflow | Approved or interrupted workflows can resume through LangGraph state/checkpointing |
-| 📚 Citation Grounding | Reports contain inline source references and persisted citation metadata |
-| 📊 Confidence Scoring | Research outputs carry project-specific confidence information |
-| 📝 Report Generation | Structured Markdown reports with executive summary and analytical sections |
-| 🧪 Report Evaluation | Generated reports are evaluated for quality and groundedness |
-| 📤 Export | Reports can be exported as Markdown, PDF, and DOCX |
-| 📈 Observability | Research and agent activity can be inspected through observability features |
-| 🐳 Containerized Development | Backend, frontend, and PostgreSQL can run through Docker Compose |
-| ⚙️ CI | GitHub Actions validates backend and frontend changes |
+| 🤖 Multi-Agent Orchestration | Specialized agents for planning, parallel research, evidence extraction, reasoning, verification, and fact-checking |
+| ⏱️ Real-Time Agent Stepper | Live tracking through every stage (`planning` → `researching` → `verifying` → `reasoning` → `fact_checking` → `awaiting_approval` → `generating_report`) |
+| 📋 Instant Research Plan | Research strategy and targeted sub-questions are persisted and visible ~5 seconds after submission |
+| 🔎 Evidence Gathering | Unstructured search results from Tavily MCP are converted into structured, traceable evidence |
+| 🛡️ Source Verification & Badges | Sources are deterministically scored with intuitive badges (`Academic / Peer-Reviewed`, `Verified Web Source`) |
+| 🧩 Claim Reasoning & Fact-Checking | Claims are synthesized and cross-checked against supporting and contradicting evidence |
+| 👤 Human-in-the-Loop Approval | Research pauses at a LangGraph checkpoint before report generation, allowing human inspection and approval |
+| 🔄 Resume-Safe Workflows | Interrupted or paused runs resume effortlessly from their exact checkpoint without re-running prior steps |
+| 📚 Sequential Citation Grounding | Every report statement is cited with clean `[Source 1]..[Source N]` markers without gaps or broken references |
+| 📊 Deterministic Confidence | Factual claims carry mathematical confidence scores (e.g. `86%`) based on source reliability and verification |
+| 📝 Structured Report Synthesis | In-depth analytical reports with executive summaries, findings, risk analyses, and recommendations |
+| 🧪 Automated Evaluation | Completed reports are evaluated across planning quality, search quality, citation coverage, and groundedness |
+| 📤 Multi-Format Export | Download reports as formatted Markdown (`.md`), PDF (`.pdf`), or Microsoft Word (`.docx`) |
+| 📈 End-to-End Observability | Traces, latencies, and token expenditures monitored via LangSmith integration |
+| 🐳 Docker & CI/CD | Fully containerized with Docker Compose and automated testing via GitHub Actions |
 
 ---
 
@@ -533,17 +538,23 @@ files/TODO.md
 
 ## 📚 Documentation
 
+Comprehensive architectural and engineering specifications are organized in the [`files/`](files/README.md) directory:
+
 | Document | Purpose |
 |---|---|
-| `files/ARCHITECTURE.md` | System architecture |
-| `files/API.md` | API documentation |
-| `files/DATABASE.md` | Database design |
-| `files/DECISIONS.md` | Architecture decisions |
-| `files/EVALUATION.md` | Evaluation design |
-| `files/MILESTONES.md` | Development roadmap |
-| `files/CURRENT_STATE.md` | Current implementation state |
-| `files/TODO.md` | Remaining work |
-| `files/DEPLOYMENT.md` | Deployment information |
+| [📖 **Documentation Portal**](files/README.md) | Central entry point and index to all technical documentation |
+| [🏛️ **System Architecture**](files/ARCHITECTURE.md) | Clean Architecture layering, domain boundaries, and LangGraph topology |
+| [⚡ **API Reference**](files/API.md) | OpenAPI / FastAPI route specifications, request/response models, and auth |
+| [🤖 **Agent Specifications**](files/AGENTS.md) | Agent mesh responsibilities, system prompts, and contributor ground rules |
+| [🚀 **Deployment & Production**](files/DEPLOYMENT.md) | Live setup on Vercel, Render, Neon PostgreSQL, and Tavily MCP |
+| [🗄️ **Database Design**](files/DATABASE.md) | Relational database schema, checkpointing models, and Alembic migrations |
+| [⚖️ **Evaluation & Quality**](files/EVALUATION.md) | Evaluation dimensions, deterministic citation scoring, and LLM judge design |
+| [💡 **Architecture Decisions**](files/DECISIONS.md) | Architecture Decision Records (ADRs) explaining key technical choices |
+| [📌 **Current State**](files/CURRENT_STATE.md) | Verified capabilities, live production features, and active milestones |
+| [🎯 **Project Overview**](files/PROJECT_OVERVIEW.md) | Product vision, target personas, problem definition, and scope boundaries |
+| [📜 **Changelog**](files/CHANGELOG.md) | Release notes and milestone progress history from Phase 0 to Milestone 32 |
+| [🗺️ **Roadmap & Milestones**](files/MILESTONES.md) | Five-phase roadmap tracking all 32 development milestones |
+| [📝 **Task Backlog**](files/TODO.md) | Completed deliverables and future backlog items |
 
 ---
 
