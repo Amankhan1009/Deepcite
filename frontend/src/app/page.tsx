@@ -1,26 +1,38 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Search, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Search,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const capabilities = [
   {
     icon: Search,
-    title: "Research deeply",
+    title: "Multi-agent planning",
     description:
-      "Turn complex questions into structured, evidence-backed research.",
+      "Decomposes complex research questions into targeted sub-questions and search strategies.",
   },
   {
     icon: ShieldCheck,
     title: "Verify every claim",
     description:
-      "Trace conclusions to sources, evidence, citations, and confidence scores.",
+      "Evaluates source reliability tiers and extracts verbatim empirical quotes before synthesis.",
+  },
+  {
+    icon: UserCheck,
+    title: "Human-in-the-loop control",
+    description:
+      "Inspect verified evidence, reliability scores, and authorize report synthesis with full operator oversight.",
   },
   {
     icon: CheckCircle2,
-    title: "Review with confidence",
+    title: "Grounded cited reports",
     description:
-      "Inspect reports, evaluations, and observability data in one workspace.",
+      "Assembles 7-section reports with traceable citations, evaluations, and 1-click multi-format export.",
   },
 ];
 
@@ -64,7 +76,7 @@ export default function HomePage() {
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
             Deepcite coordinates planning, search, verification, reasoning,
-            fact-checking, and report generation into one traceable research
+            human-in-the-loop approval, and report generation into one traceable research
             workflow.
           </p>
 
@@ -104,20 +116,37 @@ export default function HomePage() {
 
             <div className="mt-6 space-y-3">
               {[
-                "Planning",
-                "Parallel research",
+                "Planning & decomposition",
+                "Parallel source research",
                 "Evidence verification",
-                "Cited report",
+                "Human-in-the-loop approval",
+                "Grounded cited report",
               ].map((step, index) => (
                 <div
                   key={step}
-                  className="flex items-center gap-3 rounded-xl bg-card px-4 py-3"
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 ${
+                    index === 3
+                      ? "bg-primary/10 border border-primary/20"
+                      : "bg-card"
+                  }`}
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                     {index + 1}
                   </span>
-                  <span className="text-sm font-medium">{step}</span>
-                  <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" />
+                  <span
+                    className={`text-sm ${
+                      index === 3 ? "font-semibold text-primary" : "font-medium"
+                    }`}
+                  >
+                    {step}
+                  </span>
+                  {index === 3 ? (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      Operator gate
+                    </span>
+                  ) : (
+                    <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500" />
+                  )}
                 </div>
               ))}
             </div>
@@ -126,7 +155,7 @@ export default function HomePage() {
       </section>
 
       <section className="border-t border-border bg-card">
-        <div className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-16 lg:grid-cols-3 lg:px-8">
+        <div className="mx-auto grid w-full max-w-7xl gap-6 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
           {capabilities.map((capability) => {
             const Icon = capability.icon;
 

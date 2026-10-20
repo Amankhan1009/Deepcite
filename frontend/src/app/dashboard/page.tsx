@@ -67,7 +67,7 @@ const progressSteps = [
   "Planning",
   "Researching sources",
   "Verifying evidence",
-  "Human approval",
+  "Human-in-the-loop approval",
   "Generating report",
 ];
 

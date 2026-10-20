@@ -348,6 +348,63 @@ function getStatusBadge(status?: string | null) {
   };
 }
 
+function getReliabilityBadge(score: number | null | undefined) {
+  if (score === null || score === undefined) return null;
+  if (score >= 0.8) {
+    return {
+      label: `Academic / Peer-Reviewed (${score.toFixed(2)})`,
+      tooltip:
+        "Top-tier primary source (.edu, .gov, arxiv.org, nature.com, etc.) with verified domain authority.",
+      className:
+        "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    };
+  }
+  if (score >= 0.5) {
+    return {
+      label: `Verified Web Source (${score.toFixed(2)})`,
+      tooltip:
+        "Passed Deepcite's 0.50+ verification threshold with HTTPS security, valid metadata, and comprehensive content.",
+      className:
+        "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+    };
+  }
+  return {
+    label: `Supplementary Source (${score.toFixed(2)})`,
+    tooltip:
+      "General reference source meeting secondary verification guidelines.",
+    className: "bg-muted text-muted-foreground border-border",
+  };
+}
+
+function getConfidenceBadge(score: number | null | undefined) {
+  if (score === null || score === undefined) return null;
+  const pct = (score * 100).toFixed(0);
+  if (score >= 0.75) {
+    return {
+      label: `Confidence: ${pct}%`,
+      tooltip:
+        "High confidence: Claim is directly supported by authoritative external evidence.",
+      className:
+        "bg-primary/10 text-primary border-primary/20 font-medium",
+    };
+  }
+  if (score >= 0.5) {
+    return {
+      label: `Confidence: ${pct}%`,
+      tooltip:
+        "Moderate confidence: Claim is partially supported or corroborated by secondary sources.",
+      className:
+        "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 font-medium",
+    };
+  }
+  return {
+    label: `Confidence: ${pct}%`,
+    tooltip:
+      "Low confidence: Claim lacks sufficient empirical backing or contains conflicting statements.",
+    className: "bg-muted text-muted-foreground border-border font-medium",
+  };
+}
+
 function ResearchPlanCard({ plan }: { plan: ResearchPlan | null }) {
   if (!plan) return null;
 
@@ -978,21 +1035,37 @@ export default function ResearchDetailPage() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-2">
                               {item.source_reliability_score !== null &&
-                                item.source_reliability_score !== undefined && (
-                                  <span>
-                                    Reliability:{" "}
-                                    {item.source_reliability_score.toFixed(2)}
-                                  </span>
-                                )}
+                                item.source_reliability_score !== undefined && (() => {
+                                  const rel = getReliabilityBadge(
+                                    item.source_reliability_score,
+                                  );
+                                  if (!rel) return null;
+                                  return (
+                                    <span
+                                      title={rel.tooltip}
+                                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium cursor-help transition-colors ${rel.className}`}
+                                    >
+                                      {rel.label}
+                                    </span>
+                                  );
+                                })()}
                               {item.confidence_score !== null &&
-                                item.confidence_score !== undefined && (
-                                  <span>
-                                    Confidence:{" "}
-                                    {item.confidence_score.toFixed(2)}
-                                  </span>
-                                )}
+                                item.confidence_score !== undefined && (() => {
+                                  const conf = getConfidenceBadge(
+                                    item.confidence_score,
+                                  );
+                                  if (!conf) return null;
+                                  return (
+                                    <span
+                                      title={conf.tooltip}
+                                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs cursor-help transition-colors ${conf.className}`}
+                                    >
+                                      {conf.label}
+                                    </span>
+                                  );
+                                })()}
                             </div>
                           </div>
 
