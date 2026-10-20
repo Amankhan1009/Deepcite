@@ -25,6 +25,9 @@ from app.infrastructure.agents.nodes.verification_agent import (
 )
 from app.infrastructure.agents.state import GraphState
 from app.infrastructure.db.models.research_run import ResearchRun
+from app.infrastructure.db.repositories.research_plan_repository import (
+    ResearchPlanRepository,
+)
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.observability.tracing import traceable_span
 
@@ -76,6 +79,65 @@ async def _research_run_is_cancelled(research_run_id: str) -> bool:
         return False
 
 
+NODE_STATUS_MAP = {
+    "supervisor_agent": "planning",
+    "planning_agent": "planning",
+    "research_agent": "researching",
+    "verification_agent": "verifying",
+    "evidence_agent": "verifying",
+    "reasoning_agent": "reasoning",
+    "fact_checking_agent": "fact_checking",
+    "approval_gate": "awaiting_approval",
+    "report_agent": "generating_report",
+    "evaluation_agent": "generating_report",
+}
+
+
+async def _update_run_node_status(research_run_id: str, node_name: str) -> None:
+    target_status = NODE_STATUS_MAP.get(node_name)
+    if not target_status or not research_run_id:
+        return
+
+    try:
+        run_uuid = uuid.UUID(str(research_run_id))
+    except (ValueError, TypeError):
+        return
+
+    try:
+        async with AsyncSessionLocal() as db:
+            run = await db.get(ResearchRun, run_uuid)
+            if run and run.status not in ("cancelled", "completed"):
+                if run.status != target_status:
+                    run.status = target_status
+                    await db.commit()
+    except Exception:
+        pass
+
+
+async def _persist_plan_if_available(research_run_id: str, plan_data: dict) -> None:
+    if not research_run_id or not plan_data:
+        return
+
+    try:
+        run_uuid = uuid.UUID(str(research_run_id))
+    except (ValueError, TypeError):
+        return
+
+    try:
+        async with AsyncSessionLocal() as db:
+            plan_repo = ResearchPlanRepository(db)
+            existing = await plan_repo.get_for_research_run(run_uuid)
+            if not existing:
+                await plan_repo.create(
+                    research_run_id=run_uuid,
+                    sub_questions=plan_data.get("sub_questions", []),
+                    strategy=plan_data.get("strategy", ""),
+                )
+                await db.commit()
+    except Exception:
+        pass
+
+
 def _node_with_cancellation_guard(name: str, node):
     traced_node = _trace_node(name, node)
 
@@ -87,7 +149,15 @@ def _node_with_cancellation_guard(name: str, node):
                 f"Research run {research_run_id} was cancelled",
             )
 
-        return await traced_node(state)
+        if research_run_id:
+            await _update_run_node_status(research_run_id, name)
+
+        output = await traced_node(state)
+
+        if name == "planning_agent" and isinstance(output, dict) and output.get("plan"):
+            await _persist_plan_if_available(research_run_id, output["plan"])
+
+        return output
 
     return guarded_node
 
