@@ -10,6 +10,7 @@ import {
   FolderKanban,
   LogOut,
   Plus,
+  Sparkles,
   Square,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
@@ -87,6 +88,29 @@ const CANCELLABLE_STATUSES = [
   "fact_checking",
   "awaiting_approval",
   "generating_report",
+] as const;
+
+const SAMPLE_RESEARCH_PROMPTS = [
+  {
+    label: "⚡ Speculative Decoding vs Medusa",
+    query:
+      "What are the latency, memory footprint, and throughput trade-offs of Speculative Decoding versus Medusa for serving open-weight LLMs in production?",
+  },
+  {
+    label: "🔐 Post-Quantum TLS 1.3",
+    query:
+      "What are the network latency, packet fragmentation, and handshake overheads of deploying NIST's finalized post-quantum standards (ML-KEM and ML-DSA) in TLS 1.3?",
+  },
+  {
+    label: "🧬 AlphaFold 3 vs ESMFold",
+    query:
+      "How do AlphaFold 3 and ESMFold compare in prediction accuracy for protein-ligand interactions and compute cost in drug discovery?",
+  },
+  {
+    label: "🧠 Mixture of Agents (MoA)",
+    query:
+      "How does Mixture of Agents (MoA) architecture improve reasoning benchmarks compared to single frontier LLMs, and what are its token cost and latency trade-offs?",
+  },
 ] as const;
 
 const TERMINAL_STATUSES = ["completed", "cancelled", "failed"] as const;
@@ -236,6 +260,43 @@ export default function DashboardPage() {
 
     void loadWorkspaces();
   }, [router]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceId) return;
+
+    let isSubscribed = true;
+
+    async function loadWorkspaceActiveRun() {
+      try {
+        const runs = await apiFetch<ResearchRun[]>(
+          `/workspaces/${selectedWorkspaceId}/research`,
+        );
+        if (!isSubscribed) return;
+
+        // Auto-detect active run (running or awaiting approval)
+        const activeRun = runs.find((r) =>
+          ACTIVE_EXECUTION_STATUSES.includes(
+            r.status as (typeof ACTIVE_EXECUTION_STATUSES)[number],
+          ),
+        );
+
+        if (activeRun) {
+          setResearchRun(activeRun);
+          if (activeRun.status !== "cancelled") {
+            setLastNonCancelledStatus(activeRun.status);
+          }
+        }
+      } catch {
+        // Silent recovery
+      }
+    }
+
+    void loadWorkspaceActiveRun();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [selectedWorkspaceId]);
 
   async function handleCreateWorkspace(
     event: FormEvent<HTMLFormElement>,
@@ -571,6 +632,32 @@ export default function DashboardPage() {
             </div>
 
             <form onSubmit={handleStartResearch} className="mt-6 space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    Quick research topics
+                  </span>
+                  <span className="text-xs text-muted-foreground">Click to auto-fill</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SAMPLE_RESEARCH_PROMPTS.map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      onClick={() => setQuestion(sample.query)}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
+                        question === sample.query
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary border border-border/60"
+                      }`}
+                    >
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <textarea
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}

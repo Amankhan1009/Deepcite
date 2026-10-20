@@ -4,9 +4,11 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CheckCircle2,
   Clock,
   Compass,
+  Copy,
   Download,
   ExternalLink,
   FileText,
@@ -14,6 +16,7 @@ import {
   MinusCircle,
   RefreshCw,
   Send,
+  Share2,
   XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -465,6 +468,8 @@ export default function ResearchDetailPage() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [isDownloading, setIsDownloading] = useState("");
+  const [isCopiedMarkdown, setIsCopiedMarkdown] = useState(false);
+  const [isCopiedLink, setIsCopiedLink] = useState(false);
 
   const loadCompletedReport = useCallback(async () => {
     const loadedReport = await apiFetch<Report>(
@@ -676,6 +681,57 @@ export default function ResearchDetailPage() {
       setIsDownloading("");
     }
   }
+
+  async function handleCopyMarkdown() {
+    const textToCopy = renderedReportMarkdown || report?.content_markdown;
+    if (!textToCopy) return;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setIsCopiedMarkdown(true);
+      setTimeout(() => setIsCopiedMarkdown(false), 2000);
+    } catch {
+      // clipboard fallback
+    }
+  }
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setIsCopiedLink(true);
+      setTimeout(() => setIsCopiedLink(false), 2000);
+    } catch {
+      // clipboard fallback
+    }
+  }
+
+  // Dynamic browser tab title notifications
+  useEffect(() => {
+    if (!researchRun) {
+      document.title = "Deepcite";
+      return;
+    }
+
+    if (researchRun.status === "awaiting_approval") {
+      document.title = "🔔 Approval Needed - Deepcite";
+    } else if (researchRun.status === "completed") {
+      document.title = "✅ Report Ready - Deepcite";
+    } else if (researchRun.status === "cancelled") {
+      document.title = "Cancelled - Deepcite";
+    } else if (researchRun.status === "failed") {
+      document.title = "Failed - Deepcite";
+    } else {
+      const timerStr =
+        elapsedSeconds !== null ? `(${formatElapsed(elapsedSeconds)}) ` : "";
+      const stepName =
+        researchRun.status.charAt(0).toUpperCase() +
+        researchRun.status.slice(1).replace(/_/g, " ");
+      document.title = `⏳ ${timerStr}Deepcite - ${stepName}`;
+    }
+
+    return () => {
+      document.title = "Deepcite";
+    };
+  }, [researchRun, elapsedSeconds]);
 
   async function handleFeedback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1135,7 +1191,47 @@ export default function ResearchDetailPage() {
                       </h2>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyMarkdown}
+                        className="gap-1.5"
+                      >
+                        {isCopiedMarkdown ? (
+                          <>
+                            <Check className="h-4 w-4 text-emerald-500" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            Copy Report
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyLink}
+                        className="gap-1.5"
+                      >
+                        {isCopiedLink ? (
+                          <>
+                            <Check className="h-4 w-4 text-emerald-500" />
+                            Link Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4" />
+                            Share
+                          </>
+                        )}
+                      </Button>
+
                       {(["markdown", "pdf", "docx"] as const).map(
                         (format) => (
                           <Button

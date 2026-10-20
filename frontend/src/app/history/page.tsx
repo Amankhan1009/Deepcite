@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  Search,
   Settings,
+  X,
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
@@ -52,6 +54,8 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [resumingRunId, setResumingRunId] = useState("");
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     if (!getToken()) {
@@ -147,6 +151,47 @@ export default function HistoryPage() {
     }
   }
 
+  const completedCount = history.filter((r) => r.status === "completed").length;
+  const approvalCount = history.filter(
+    (r) => r.status === "awaiting_approval",
+  ).length;
+  const activeCount = history.filter((r) =>
+    [
+      "planning",
+      "researching",
+      "verifying",
+      "reasoning",
+      "fact_checking",
+      "generating_report",
+    ].includes(r.status),
+  ).length;
+
+  const filteredHistory = history.filter((run) => {
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      run.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      run.workspace_name.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (statusFilter === "all") return true;
+    if (statusFilter === "completed") return run.status === "completed";
+    if (statusFilter === "awaiting_approval")
+      return run.status === "awaiting_approval";
+    if (statusFilter === "cancelled") return run.status === "cancelled";
+    if (statusFilter === "active")
+      return [
+        "planning",
+        "researching",
+        "verifying",
+        "reasoning",
+        "fact_checking",
+        "generating_report",
+      ].includes(run.status);
+
+    return true;
+  });
+
   return (
     <main className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -233,58 +278,132 @@ export default function HistoryPage() {
           </div>
         )}
 
-        <div className="mt-8 space-y-4">
-          {history.map((run) => (
-            <div
-              key={run.id}
-              className="rounded-xl border border-border bg-card p-6"
-            >
-              <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
-                <Link
-                  href={`/research/${run.id}`}
-                  className="min-w-0 flex-1 transition-colors hover:text-primary"
-                >
-                  <p className="text-lg font-semibold">
-                    {run.question}
-                  </p>
+        {!isLoading && !error && history.length > 0 && (
+          <>
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by topic or workspace..."
+                  className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-8 text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
 
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Workspace: {run.workspace_name}
-                  </p>
-
-                  <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock3 className="h-4 w-4" />
-                    {formatDate(run.created_at)}
-                  </div>
-                </Link>
-
-                <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium capitalize text-primary">
-                    {statusLabel(run.status)}
-                  </span>
-
-                  {(run.status === "paused" ||
-                    run.status === "failed") && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={(event) =>
-                        handleResume(event, run.id)
-                      }
-                      disabled={resumingRunId === run.id}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-
-                      {resumingRunId === run.id
-                        ? "Resuming..."
-                        : "Resume research"}
-                    </Button>
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                {[
+                  { id: "all", label: `All (${history.length})` },
+                  { id: "completed", label: `Completed (${completedCount})` },
+                  {
+                    id: "awaiting_approval",
+                    label: `Needs Approval (${approvalCount})`,
+                  },
+                  { id: "active", label: `In Progress (${activeCount})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStatusFilter(tab.id)}
+                    className={`rounded-full px-3 py-1 font-medium transition-all ${
+                      statusFilter === tab.id
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+
+            {filteredHistory.length === 0 ? (
+              <div className="mt-8 rounded-xl border border-dashed border-border bg-card p-10 text-center">
+                <Search className="mx-auto h-8 w-8 text-muted-foreground" />
+                <h3 className="mt-3 text-base font-semibold">
+                  No matching research runs found
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try adjusting your search query or status filter.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                {filteredHistory.map((run) => (
+                  <div
+                    key={run.id}
+                    className="rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/30"
+                  >
+                    <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
+                      <Link
+                        href={`/research/${run.id}`}
+                        className="min-w-0 flex-1 transition-colors hover:text-primary"
+                      >
+                        <p className="text-lg font-semibold">
+                          {run.question}
+                        </p>
+
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Workspace: {run.workspace_name}
+                        </p>
+
+                        <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock3 className="h-4 w-4" />
+                          {formatDate(run.created_at)}
+                        </div>
+                      </Link>
+
+                      <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium capitalize text-primary">
+                          {statusLabel(run.status)}
+                        </span>
+
+                        {(run.status === "paused" ||
+                          run.status === "failed") && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(event) =>
+                              handleResume(event, run.id)
+                            }
+                            disabled={resumingRunId === run.id}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+
+                            {resumingRunId === run.id
+                              ? "Resuming..."
+                              : "Resume research"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </section>
     </main>
   );
