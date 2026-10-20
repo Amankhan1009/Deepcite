@@ -232,8 +232,6 @@ def _append_pdf_asset(
 
 
 def render_pdf(exportable: ExportableReport) -> bytes:
-    report = exportable.report
-
     output = BytesIO()
     document = SimpleDocTemplate(
         output,
@@ -379,7 +377,6 @@ def _add_docx_heading(
 
 
 def render_docx(exportable: ExportableReport) -> bytes:
-    report = exportable.report
     document = Document()
 
     document.add_heading("Deepcite Research Report", level=0)
