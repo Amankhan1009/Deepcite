@@ -10,6 +10,7 @@ Deepcite is an evidence-grounded multi-agent research platform designed to trans
 
 | Document | Purpose |
 | :--- | :--- |
+| [📘 **Full Workflow & Architecture Guide**](FULL_WORKFLOW_EXPLAINED.md) | **Exhaustive end-to-end walkthrough of the 10-stage pipeline, data flow, and interview guide** |
 | [Architecture](ARCHITECTURE.md) | Clean Architecture layering, domain boundaries, state machine, and LangGraph topology |
 | [API Reference](API.md) | Complete OpenAPI/FastAPI endpoint specification, request/response models, and auth contracts |
 | [Agents & Workflow](AGENTS.md) | Agent mesh specifications, prompts, node responsibilities, and developer guidelines |

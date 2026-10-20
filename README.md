@@ -542,6 +542,7 @@ Comprehensive architectural and engineering specifications are organized in the 
 
 | Document | Purpose |
 |---|---|
+| [📘 **Full Workflow & Architecture Guide**](files/FULL_WORKFLOW_EXPLAINED.md) | **Exhaustive end-to-end walkthrough of the 10-stage pipeline, data flow, and interview guide** |
 | [📖 **Documentation Portal**](files/README.md) | Central entry point and index to all technical documentation |
 | [🏛️ **System Architecture**](files/ARCHITECTURE.md) | Clean Architecture layering, domain boundaries, and LangGraph topology |
 | [⚡ **API Reference**](files/API.md) | OpenAPI / FastAPI route specifications, request/response models, and auth |
