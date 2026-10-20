@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="sparkle" x1="28" y1="20" x2="48" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+  <rect x="1" y="1" width="62" height="62" rx="15" stroke="rgba(255,255,255,0.22)" stroke-width="2" />
+
+  <!-- Bold Modern 'D' -->
+  <!-- Stem -->
+  <rect x="14" y="14" width="8" height="36" rx="4" fill="#ffffff" />
+  
+  <!-- Curved D Loop -->
+  <path d="M18 14 H32 C43.5 14 50 21.5 50 32 C50 42.5 43.5 50 32 50 H18"
+        stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Evidence Sparkle (✦) inside the D bowl -->
+  <path d="M33 32 C33 28 35.5 25.5 39.5 25.5 C35.5 25.5 33 23 33 19 C33 23 30.5 25.5 26.5 25.5 C30.5 25.5 33 28 33 32 Z"
+        fill="url(#sparkle)" />
+</svg>
