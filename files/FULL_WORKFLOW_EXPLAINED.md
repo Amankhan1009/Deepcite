@@ -118,9 +118,10 @@ flowchart TD
 - **Prompt Goal**: Read the user's research query, identify ambiguity, and decompose it into:
   1. An overall **Decomposition Strategy** (e.g. *Comparative Benchmark & Architectural Trade-off Analysis*).
   2. Exactly **3 targeted sub-questions** designed for orthogonal web searches (e.g., Sub-Q1: End-to-end latency benchmarks, Sub-Q2: Memory/KV-cache overhead, Sub-Q3: Throughput scaling).
-- **The Immediate Persistence Innovation**:
+- **The Immediate Persistence & UI Placement Innovation**:
   In early versions of Deepcite, users waited 2 minutes with a generic loading spinner before seeing anything. In Deepcite v3, the moment `planning_agent` completes, the backend saves the `ResearchPlan` directly to the `research_plans` PostgreSQL table.
-  - The UI fetches `GET /api/v1/research/{id}/plan` and **immediately renders the interactive strategy card within 5 seconds**. The user instantly sees what the agent is planning to investigate while the search workers begin.
+  - The UI fetches `GET /api/v1/research/{id}/plan` and **immediately renders the interactive strategy card within 5 seconds**.
+  - **Clean Stepper Hierarchy**: The live 6-stage execution stepper remains completely unified and continuous (Steps 1–6 without interruption). The **Research Plan & Strategy** card docks cleanly directly beneath the stepper, displaying the decomposition approach and the 3 targeted sub-questions without disrupting the pipeline timeline.
 
 ---
 
@@ -205,6 +206,7 @@ flowchart TD
   - The research run status in the database is set to `awaiting_approval`.
 - **The User Experience**:
   - The research detail page transitions to the **Evidence Review Modal**.
+  - **Contextual Review Layout**: The **Research Plan & Strategy** card is presented right at the top of the evidence review section, giving the human reviewer immediate visibility into the supervisor's decomposition approach and targeted sub-questions alongside the extracted findings.
   - The human reviewer can inspect every extracted finding, read the source snippet, see the source URL, and verify the reliability tier.
 - **Bi-Directional Review**:
   1. **Approve Research**: The user clicks "Approve Research". The frontend calls `POST /api/v1/research/{id}/approve`. The backend retrieves the LangGraph checkpoint by `thread_id=research_run_id` and resumes execution right where it paused—without having to re-search or re-extract anything!

@@ -258,6 +258,9 @@ search integration, LangSmith tracing, and full human-in-the-loop workflows.
   and `Verified Web Source`) and human-readable percentage confidence scores.
 - M32 adds active research run recovery, tab notifications, topic chips, and
   custom branding assets (Deepcite tab favicon and app icons).
+- M32 refines research execution layout: isolates the `ResearchPlanCard` from the 6-stage
+  stepper into a dedicated card underneath, ensuring the agent pipeline stays continuous
+  (Steps 1–6) and surfaces the strategy directly above the Evidence Review view for contextual approval.
 
 ## What doesn't exist yet / Future Enhancements
 - Fetch/scrape MCP integration for deep full-text web scraping.

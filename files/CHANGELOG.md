@@ -13,6 +13,7 @@ Completed the final phase of Deepcite production deployment, UX refinement, and 
 - Integrated human-in-the-loop features across landing, dashboard, and research views, empowering users to intervene and approve or reject claims before report synthesis.
 - Added contextual source reliability badges (`Academic / Peer-Reviewed` and `Verified Web Source`) and intuitive percentage confidence scores (`Confidence: 86%`).
 - Added active run recovery, browser tab status notifications, quick-start research topic chips, and custom Deepcite favicon and branding.
+- Refined `/research/[id]` execution layout and stepper hierarchy: moved the `ResearchPlanCard` out of the in-progress stepper card to cleanly dock beneath it. The 6-stage pipeline (Steps 1–6) remains continuous and uninterrupted, and the plan displays at the top of the Evidence Review view for contextual Human-in-the-Loop review.
 - Verified all 65 unit and agent tests pass, TypeScript compiles with 0 errors, and ESLint passes with 0 errors.
 
 ## Milestone 27 — Settings, research history, and run selection
