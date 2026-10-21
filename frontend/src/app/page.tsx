@@ -102,15 +102,20 @@ export default function HomePage() {
           <div className="rounded-2xl border border-border bg-muted p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Active research
-                </p>
-                <h2 className="mt-1 text-lg font-semibold">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    Workflow Preview
+                  </span>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Example run
+                  </p>
+                </div>
+                <h2 className="mt-1.5 text-lg font-semibold">
                   AI adoption and risk
                 </h2>
               </div>
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Completed
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-500/20">
+                Sample Output
               </span>
             </div>
 
@@ -150,6 +155,10 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Visual preview of the autonomous 5-stage agent execution pipeline.
+            </p>
           </div>
         </div>
       </section>
