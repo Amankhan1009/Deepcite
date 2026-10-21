@@ -102,7 +102,7 @@ The result is a research workflow where you can follow **how the answer was prod
 |---|---|
 | 🤖 Multi-Agent Orchestration | Specialized agents for planning, parallel research, evidence extraction, reasoning, verification, and fact-checking |
 | ⏱️ Real-Time Agent Stepper | Live tracking through every stage (`planning` → `researching` → `verifying` → `reasoning` → `fact_checking` → `awaiting_approval` → `generating_report`) |
-| 📋 Instant Research Plan | Research strategy and targeted sub-questions are persisted and visible ~5 seconds after submission |
+| 📋 Instant Research Plan | Research strategy and targeted sub-questions are persisted ~5s into execution and cleanly docked beneath the active stepper |
 | 🔎 Evidence Gathering | Unstructured search results from Tavily MCP are converted into structured, traceable evidence |
 | 🛡️ Source Verification & Badges | Sources are deterministically scored with intuitive badges (`Academic / Peer-Reviewed`, `Verified Web Source`) |
 | 🧩 Claim Reasoning & Fact-Checking | Claims are synthesized and cross-checked against supporting and contradicting evidence |
@@ -217,8 +217,10 @@ Deepcite/
 │   ├── DECISIONS.md
 │   ├── DEPLOYMENT.md
 │   ├── EVALUATION.md
+│   ├── FULL_WORKFLOW_EXPLAINED.md
 │   ├── MILESTONES.md
 │   ├── PROJECT_OVERVIEW.md
+│   ├── README.md
 │   └── TODO.md
 ├── scripts/
 ├── .github/workflows/ci.yml
@@ -262,9 +264,9 @@ docker compose down -v
 
 ### Hosted Backend
 
-The backend is deployed on Render's free tier:
+The backend is deployed on Render:
 
-- Backend URL: [https://deepcite-backend.onrender.com/docs](https://deepcite-backend.onrender.com)
+- Backend URL: [https://deepcite-967b.onrender.com/docs](https://deepcite-967b.onrender.com)
 
 > ⚠️ Because this uses Render's free tier, the service may be asleep. If requests fail, wake it up by visiting the URL above and wait a minute for it to start.
 
