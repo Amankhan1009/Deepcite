@@ -1210,92 +1210,94 @@ export default function ResearchDetailPage() {
               !["awaiting_approval", "paused", "failed", "cancelled"].includes(
                 researchRun.status,
               ) && (
-                <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                <>
+                  <section className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                        </div>
+                        <div>
+                          <h2 className="font-semibold text-lg">
+                            {getStepMeta(researchRun.status).title}
+                          </h2>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {getStepMeta(researchRun.status).subtitle}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="font-semibold text-lg">
-                          {getStepMeta(researchRun.status).title}
-                        </h2>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {getStepMeta(researchRun.status).subtitle}
-                        </p>
-                      </div>
+                      {elapsedSeconds !== null && (
+                        <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-xs font-medium text-foreground border border-border shrink-0">
+                          <Clock className="h-3.5 w-3.5 text-primary" />
+                          <span>Elapsed: <strong>{formatElapsed(elapsedSeconds)}</strong></span>
+                        </div>
+                      )}
                     </div>
-                    {elapsedSeconds !== null && (
-                      <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-xs font-medium text-foreground border border-border shrink-0">
-                        <Clock className="h-3.5 w-3.5 text-primary" />
-                        <span>Elapsed: <strong>{formatElapsed(elapsedSeconds)}</strong></span>
-                      </div>
-                    )}
-                  </div>
+
+                    <div className="mt-6 space-y-3">
+                      {detailedProgressSteps.map((step, index) => {
+                        const activeIndex = getActiveStepIndex(researchRun.status);
+                        const isCompleted = index < activeIndex;
+                        const isCurrent = index === activeIndex;
+
+                        return (
+                          <div
+                            key={step.statusKey}
+                            className={`flex items-start gap-3.5 p-3.5 rounded-xl transition-all border ${
+                              isCurrent
+                                ? "bg-primary/10 border-primary/30 shadow-sm"
+                                : isCompleted
+                                  ? "bg-muted/40 border-border/40"
+                                  : "border-transparent opacity-60"
+                            }`}
+                          >
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                                isCurrent
+                                  ? "bg-primary text-primary-foreground animate-pulse"
+                                  : isCompleted
+                                    ? "bg-emerald-500 text-white"
+                                    : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {isCompleted ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : (
+                                index + 1
+                              )}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span
+                                  className={`text-sm font-medium ${
+                                    isCurrent ? "text-primary font-semibold" : ""
+                                  }`}
+                                >
+                                  {step.label}
+                                </span>
+                                {isCurrent && (
+                                  <span className="text-xs text-primary font-medium flex items-center gap-1">
+                                    <RefreshCw className="h-3 w-3 animate-spin" /> In progress
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {step.description}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
 
                   {plan && (
-                    <div className="mt-5">
+                    <div className="mt-6">
                       <ResearchPlanCard plan={plan} />
                     </div>
                   )}
-
-                  <div className="mt-6 space-y-3">
-                    {detailedProgressSteps.map((step, index) => {
-                      const activeIndex = getActiveStepIndex(researchRun.status);
-                      const isCompleted = index < activeIndex;
-                      const isCurrent = index === activeIndex;
-
-                      return (
-                        <div
-                          key={step.statusKey}
-                          className={`flex items-start gap-3.5 p-3.5 rounded-xl transition-all border ${
-                            isCurrent
-                              ? "bg-primary/10 border-primary/30 shadow-sm"
-                              : isCompleted
-                                ? "bg-muted/40 border-border/40"
-                                : "border-transparent opacity-60"
-                          }`}
-                        >
-                          <span
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                              isCurrent
-                                ? "bg-primary text-primary-foreground animate-pulse"
-                                : isCompleted
-                                  ? "bg-emerald-500 text-white"
-                                  : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {isCompleted ? (
-                              <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                              index + 1
-                            )}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span
-                                className={`text-sm font-medium ${
-                                  isCurrent ? "text-primary font-semibold" : ""
-                                }`}
-                              >
-                                {step.label}
-                              </span>
-                              {isCurrent && (
-                                <span className="text-xs text-primary font-medium flex items-center gap-1">
-                                  <RefreshCw className="h-3 w-3 animate-spin" /> In progress
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {step.description}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
+                </>
               )}
 
             {report && (
