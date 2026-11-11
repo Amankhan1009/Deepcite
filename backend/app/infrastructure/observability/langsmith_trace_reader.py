@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -28,6 +29,85 @@ class LangSmithTraceReader:
             api_url=settings.langsmith_endpoint,
         )
         self.project_name = settings.langsmith_project
+        self._project_id: str | None = None
+
+    def _get_project_id(self) -> str | None:
+        if self._project_id:
+            return self._project_id
+        if hasattr(self.client, "read_project"):
+            try:
+                project = self.client.read_project(project_name=self.project_name)
+                if project and getattr(project, "id", None):
+                    self._project_id = str(project.id)
+                    return self._project_id
+            except Exception:
+                pass
+        return None
+
+    def _query_runs(
+        self,
+        *,
+        filter: str | None = None,
+        is_root: bool | None = None,
+        trace_id: Any | None = None,
+        limit: int = 100,
+    ) -> list[Any]:
+        # Prefer modern SmithDB-backed query_v2 endpoint (/api/v2/runs/query)
+        # to eliminate deprecated calls to legacy POST /runs/query.
+        project_id = self._get_project_id()
+        if (
+            project_id
+            and hasattr(self.client, "runs")
+            and hasattr(self.client.runs, "query_v2")
+        ):
+            try:
+                min_start = datetime.now(UTC) - timedelta(days=90)
+                kwargs: dict[str, Any] = {
+                    "project_ids": [project_id],
+                    "page_size": limit,
+                    "selects": [
+                        "id",
+                        "name",
+                        "run_type",
+                        "inputs",
+                        "extra",
+                        "start_time",
+                        "end_time",
+                        "prompt_tokens",
+                        "completion_tokens",
+                        "total_tokens",
+                        "total_cost",
+                        "status",
+                        "error",
+                    ],
+                    "min_start_time": min_start,
+                }
+                if filter:
+                    kwargs["filter"] = filter
+                if is_root is not None:
+                    kwargs["is_root"] = is_root
+                if trace_id:
+                    kwargs["trace_id"] = str(trace_id)
+
+                return list(self.client.runs.query_v2(**kwargs))
+            except Exception:
+                pass
+
+        # Fallback to list_runs for backwards compatibility with test fixtures
+        if hasattr(self.client, "list_runs"):
+            list_kwargs: dict[str, Any] = {
+                "project_name": self.project_name,
+                "limit": limit,
+            }
+            if filter:
+                list_kwargs["filter"] = filter
+            if is_root is not None:
+                list_kwargs["is_root"] = is_root
+            if trace_id:
+                list_kwargs["trace_id"] = trace_id
+            return list(self.client.list_runs(**list_kwargs))
+
+        return []
 
     def _contains_research_run_id(
         self,
@@ -136,8 +216,7 @@ class LangSmithTraceReader:
         self,
         research_run_id: uuid.UUID,
     ) -> Any | None:
-        runs = self.client.list_runs(
-            project_name=self.project_name,
+        runs = self._query_runs(
             filter='eq(name, "research_graph")',
             is_root=True,
             limit=100,
@@ -158,12 +237,9 @@ class LangSmithTraceReader:
         if root is None:
             return []
 
-        runs = list(
-            self.client.list_runs(
-                project_name=self.project_name,
-                trace_id=root.id,
-                limit=100,
-            )
+        runs = self._query_runs(
+            trace_id=root.id,
+            limit=100,
         )
 
         if not any(run.id == root.id for run in runs):

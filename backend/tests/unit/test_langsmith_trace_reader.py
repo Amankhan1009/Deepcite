@@ -19,6 +19,28 @@ class FakeLangSmithClient:
         return iter([self.root_run, self.child_run])
 
 
+class FakeRunsResource:
+    def __init__(self, root_run, child_run):
+        self.root_run = root_run
+        self.child_run = child_run
+        self.last_query_kwargs = None
+
+    def query_v2(self, **kwargs):
+        self.last_query_kwargs = kwargs
+        if kwargs.get("is_root"):
+            return iter([self.root_run])
+        return iter([self.root_run, self.child_run])
+
+
+class FakeLangSmithV2Client:
+    def __init__(self, root_run, child_run):
+        self.project_id = uuid.uuid4()
+        self.runs = FakeRunsResource(root_run, child_run)
+
+    def read_project(self, project_name):
+        return SimpleNamespace(id=self.project_id)
+
+
 def test_reader_normalizes_trace_runs():
     research_run_id = uuid.uuid4()
     root_id = uuid.uuid4()
@@ -122,3 +144,56 @@ def test_reader_returns_no_rows_for_unknown_research_run():
     rows = reader.read_for_research_run(research_run_id)
 
     assert rows == []
+
+
+def test_reader_uses_smithdb_query_v2_when_available():
+    research_run_id = uuid.uuid4()
+    root_id = uuid.uuid4()
+    child_id = uuid.uuid4()
+
+    root_run = SimpleNamespace(
+        id=root_id,
+        name="research_graph",
+        run_type="chain",
+        inputs={"research_run_id": str(research_run_id)},
+        extra={"metadata": {}},
+        start_time=None,
+        end_time=None,
+        prompt_tokens=50,
+        completion_tokens=25,
+        total_tokens=75,
+        total_cost=None,
+        status="success",
+        error=None,
+    )
+    child_run = SimpleNamespace(
+        id=child_id,
+        name="agent.planning_agent",
+        run_type="chain",
+        inputs={},
+        extra={"metadata": {}},
+        start_time=None,
+        end_time=None,
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+        total_cost=None,
+        status="success",
+        error=None,
+    )
+
+    client = FakeLangSmithV2Client(root_run, child_run)
+    reader = LangSmithTraceReader(client=client)
+
+    rows = reader.read_for_research_run(research_run_id)
+
+    assert len(rows) == 2
+    assert rows[0]["langsmith_run_id"] == root_id
+    assert rows[0]["agent_name"] == "research_graph"
+    assert rows[1]["langsmith_run_id"] == child_id
+    # Assert query_v2 parameters were populated correctly
+    assert client.runs.last_query_kwargs is not None
+    assert "project_ids" in client.runs.last_query_kwargs
+    assert client.runs.last_query_kwargs["project_ids"] == [str(client.project_id)]
+    assert "selects" in client.runs.last_query_kwargs
+    assert client.runs.last_query_kwargs["trace_id"] == str(root_id)
