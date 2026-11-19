@@ -179,6 +179,14 @@ class LangSmithTraceReader:
         if total_cost is None:
             total_cost = Decimal("0")
 
+        # In SmithDB, trace root queries include cumulative aggregates under trace_aggregates
+        trace_aggs = getattr(run, "trace_aggregates", None)
+        if isinstance(trace_aggs, dict):
+            if trace_aggs.get("total_tokens"):
+                total_tokens = trace_aggs["total_tokens"]
+            if trace_aggs.get("total_cost"):
+                total_cost = trace_aggs["total_cost"]
+
         retry_count = (
             metadata.get("retry_count")
             or metadata.get("retries")

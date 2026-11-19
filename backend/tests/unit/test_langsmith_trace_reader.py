@@ -163,6 +163,7 @@ def test_reader_uses_smithdb_query_v2_when_available():
         completion_tokens=25,
         total_tokens=75,
         total_cost=None,
+        trace_aggregates={"total_tokens": 120, "total_cost": "0.0500"},
         status="success",
         error=None,
     )
@@ -190,6 +191,8 @@ def test_reader_uses_smithdb_query_v2_when_available():
     assert len(rows) == 2
     assert rows[0]["langsmith_run_id"] == root_id
     assert rows[0]["agent_name"] == "research_graph"
+    assert rows[0]["token_usage"]["total_tokens"] == 120
+    assert rows[0]["token_usage"]["total_cost"] == "0.0500"
     assert rows[1]["langsmith_run_id"] == child_id
     # Assert query_v2 parameters were populated correctly
     assert client.runs.last_query_kwargs is not None
