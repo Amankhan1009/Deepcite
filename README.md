@@ -221,6 +221,7 @@ Deepcite/
 │   ├── MILESTONES.md
 │   ├── PROJECT_OVERVIEW.md
 │   ├── README.md
+│   ├── TECH_STACK_REPORT.md
 │   └── TODO.md
 ├── scripts/
 ├── .github/workflows/ci.yml
@@ -553,6 +554,7 @@ Comprehensive architectural and engineering specifications are organized in the 
 | [🗄️ **Database Design**](files/DATABASE.md) | Relational database schema, checkpointing models, and Alembic migrations |
 | [⚖️ **Evaluation & Quality**](files/EVALUATION.md) | Evaluation dimensions, deterministic citation scoring, and LLM judge design |
 | [💡 **Architecture Decisions**](files/DECISIONS.md) | Architecture Decision Records (ADRs) explaining key technical choices |
+| [🔬 **Tech Stack Report**](files/TECH_STACK_REPORT.md) | Technical stack evaluation, library justifications, and architectural trade-offs |
 | [📌 **Current State**](files/CURRENT_STATE.md) | Verified capabilities, live production features, and active milestones |
 | [🎯 **Project Overview**](files/PROJECT_OVERVIEW.md) | Product vision, target personas, problem definition, and scope boundaries |
 | [📜 **Changelog**](files/CHANGELOG.md) | Release notes and milestone progress history from Phase 0 to Milestone 32 |

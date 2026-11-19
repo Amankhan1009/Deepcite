@@ -18,6 +18,7 @@ Deepcite is an evidence-grounded multi-agent research platform designed to trans
 | [Database Schema](DATABASE.md) | Relational data model, checkpointing tables, migrations, and relationship diagrams |
 | [Evaluation & Quality](EVALUATION.md) | Evaluation dimensions, deterministic citation scoring, and LLM-as-a-judge metrics |
 | [Architecture Decisions](DECISIONS.md) | Architecture Decision Records (ADRs) detailing why specific technical choices were made |
+| [Tech Stack Report](TECH_STACK_REPORT.md) | Deep-dive technical audit, library trade-offs, and dependency justifications |
 | [Current State](CURRENT_STATE.md) | Snapshot of implemented features, live capabilities, and verified milestones |
 | [Project Overview](PROJECT_OVERVIEW.md) | High-level product vision, user personas, problem statement, and scope boundaries |
 | [Changelog](CHANGELOG.md) | Chronological release and milestone history from Phase 0 to Milestone 32 |
